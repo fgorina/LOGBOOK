@@ -286,6 +286,10 @@ void switchTo(int i){
         }
         currentScreen = screens[i];
         currentScreen->enter();
+      }else{
+        Serial.print("Screen ");
+        Serial.print(i);
+        Serial.println(" not implemented");
       }
     }
 }

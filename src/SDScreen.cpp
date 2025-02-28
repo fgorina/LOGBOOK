@@ -67,16 +67,16 @@ int SDScreen::run()
   {
     do_select_file();
   }
-  if (brecord != nullptr && brecord->wasPressed())
+  if (brecord != nullptr && brecord->wasReleased())
   {
     return (0);
   }
-  if (bup != nullptr && bup->wasPressed())
+  if (bup != nullptr && bup->wasReleased())
   {
     first_file = max(first_file - FILES_SCREEN, 0);
     drawSD();
   }
-  if (bdown != nullptr && bdown->wasPressed())
+  if (bdown != nullptr && bdown->wasReleased())
   {
     first_file = min(first_file + FILES_SCREEN, max(n_files - FILES_SCREEN, 0));
     drawSD();

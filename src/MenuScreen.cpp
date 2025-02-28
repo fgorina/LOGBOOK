@@ -6,8 +6,6 @@
 MenuScreen::MenuScreen(int width, int height, const char *title) : Screen(width, height, title)
 {
     Serial.println("MenuScreen::MenuScreen");
-
-   
 }
 
 MenuScreen::~MenuScreen()
@@ -26,7 +24,7 @@ void MenuScreen::enter()
     bfiles = new Button(width / 4, 70, width / 2, 50, false, "Logs", off_clrs, on_clrs, MC_DATUM);
     binspector = new Button(width / 4, 130, width / 2, 50, false, "Inspector", off_clrs, on_clrs, MC_DATUM);
     bweb = new Button(width / 4, 190, width / 2, 50, false, "Web", off_clrs, on_clrs, MC_DATUM);
-    
+
     draw();
 }
 void MenuScreen::exit()
