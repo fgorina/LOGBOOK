@@ -1,0 +1,19 @@
+Backtrace: 0x401681f8:0x3ffb2210 0x400d3494:0x3ffb2230 0x400d5a10:0x3ffb2250 0x400d5a3a:0x3ffb2270 0x400e5e89:0x3ffb2290
+ELF file SHA256: af13c01dc3441ecb
+
+
+fgorina@Pacos-Mac-mini Logbook % addr2line -e /Users/fgorina/PlatformIO/Projects/Logbook/.pio/build/m5stack-core2/firmware.elf 0x401681f8:0x3ffb2210 0x400d3494:0x3ffb2230 0x400d5a10:0x3ffb2250 0x400d5a3a:0x3ffb2270 0x400e5e89:0x3ffb2290
+/Users/fgorina/PlatformIO/Projects/Logbook/.pio/libdeps/m5stack-core2/M5Tough/src/utility/M5Button.cpp:226
+/Users/fgorina/PlatformIO/Projects/Logbook/src/MenuScreen.cpp:81 (discriminator 1)
+/Users/fgorina/PlatformIO/Projects/Logbook/src/main.cpp:324
+/Users/fgorina/PlatformIO/Projects/Logbook/src/main.cpp:347
+/Users/fgorina/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp:50
+
+
+0x401681f8:0x3ffb2210 0x400d3494:0x3ffb2230 0x400d5a10:0x3ffb2250 0x400d5a3a:0x3ffb2270 0x400e5e89:0x3ffb2290
+
+
+
+addr2line -e /Users/fgorina/PlatformIO/Projects/Logbook/.pio/build/m5stack-core2/firmware.elf 0x401681f8:0x3ffb2210 0x400d3494:0x3ffb2230 0x400d5a10:0x3ffb2250 0x400d5a3a:0x3ffb2270 0x400e5e89:0x3ffb2290
+
+addr2line -e /Users/fgorina/PlatformIO/Projects/Logbook/.pio/build/m5stack-core2/firmware.elf 0x01fffffd:0x3ffb2130 0x400dbc52:0x3ffb2160 0x400dc027:0x3ffb2180 0x400dc586:0x3ffb21d0 0x400d8fa1:0x3ffb2250 0x400d5a36:0x3ffb2270 0x400e5e91:0x3ffb2290

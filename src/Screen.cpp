@@ -23,10 +23,10 @@ void Screen::exit()
 
 void Screen::draw()
 {
-    M5.Lcd.clear();
-    M5.Buttons.draw();
+
 }
-bool Screen::run()
+int Screen::run()
 {
-    return !wantToClose;
+    Serial.println("Screen::run");
+    return -1;
 }

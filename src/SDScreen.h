@@ -6,7 +6,7 @@
 #include "Screen.h"
 
 #define  MAXFILES 100
-#define  MAXNAME  11 + 5
+#define  MAXNAME  20
 #define HEADER_SIZE  30
 #define  FILES_SCREEN  7
 
@@ -17,7 +17,7 @@ class SDScreen : public Screen
     void enter();
     void exit();
     void draw();
-    bool run();
+    int run();
 
     protected: 
     
@@ -26,12 +26,9 @@ class SDScreen : public Screen
     int first_file = 0;
     int selected_file = -1; 
 
-    ButtonColors on_clrs = {BLUE, CYAN, WHITE};
-    ButtonColors off_clrs = {BLACK, CYAN, WHITE};
-    ButtonColors selected_clrs = {RED, WHITE, WHITE};
-    Button brecord = Button(width / 2 + width / 8, height / 2 - 30, width / 4, 60, false, "Start", off_clrs, on_clrs, MC_DATUM);
-    Button bup = Button(width / 2 + width / 8, 10, width / 4, 60, false, "^", off_clrs, on_clrs, MC_DATUM);
-    Button bdown = Button(width / 2 + width / 8, height - 70, width / 4, 60, false, "v", off_clrs, on_clrs, MC_DATUM); 
+    Button *brecord = nullptr;
+    Button *bup = nullptr;
+    Button *bdown = nullptr; 
 
 
     void sortFiles();

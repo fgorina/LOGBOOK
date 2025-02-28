@@ -13,17 +13,13 @@ class Screen
         int height;
         const char* title;
 
-        bool wantToClose = false;
-
-
- 
     public:
     Screen(int width, int height, const char* title);
     
-    void enter();
-    void exit();
-    void draw();
-    bool run();
+    virtual void enter();
+    virtual void exit();
+    virtual void draw();
+    virtual int run();
 
 };
 
