@@ -38,10 +38,10 @@ public:
     
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};
     tDoubleData sog{when : 0, origin : 0, value : 0.0}; // Speed in m/s
-    tPositionData position{when : 0, origin : 0, latitude : 0.0, longitude : 0.0};
+    tPositionData position{when : 0, origin : 0, latitude : 42.380118, longitude : 3.23328};
     tHeadingData heading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
     tAttitudeData attitude{when : 0, origin : 0, yaw : 0.0, pitch : 0.0, roll : 0.0};
-    tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // Rad/s
+    tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // degrees/s
     tDoubleData deviation{when : 0, origin : 0, value : 0.0};
     tDoubleData variation{when : 0, origin : 0, value : 0.0};
     tDoubleData rudderAngle{when : 0, origin : 0, value : 0.0};     // rudder.angle
@@ -67,6 +67,8 @@ public:
     void HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose);
 
     void printInfo();
+    void saveCsv(File f);
+    void saveGPXTrackpoint(File f);
 };
 
 #endif

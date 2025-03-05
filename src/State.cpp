@@ -606,3 +606,76 @@ void tState::tState::printInfo()
     Serial.print("Rudder Angle: ");
     Serial.println(rudderAngle.value);
 }
+
+/*  Csv files use different units:
+    Latitut i Longitut en graus amb decimals
+    Cog en graus
+    Sog en nusos
+    Heading, Pich, Roll en graus 
+    Rot en graus/s
+    Awa en graus 
+    Aws en nusos
+
+*/
+
+
+void tState::saveCsv(File f){
+    char buffer[100];
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+
+   
+
+    strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
+    sprintf(buffer, "%s\t", buffer);
+    f.print(buffer);
+    sprintf(buffer, "%f\t%f\t", position.longitude, position.latitude );
+    f.print(buffer);
+    sprintf(buffer, "%f\t%f\t", cog.heading/PI*180.0, sog.value*3600.0/1852.0);
+    f.print(buffer);
+    sprintf(buffer, "%f\t%f\t%f\t%f\t", heading.heading/PI*180.0, attitude.pitch/PI*180.0, attitude.roll/PI*180.0, rateOfTurn.value/PI*180.0);
+    f.print(buffer);
+    sprintf(buffer, "%f\t%f", wind.angle/PI*180.0, wind.speed*3600.0/1852.0);
+    f.println(buffer);
+}
+void tState::saveGPXTrackpoint(File f){
+    char buffer[100];
+    struct tm timeinfo;
+    
+    sprintf(buffer, "<trkpt lat=\"%f\" lon=\"%f\">", position.longitude, position.latitude );
+    f.println(buffer);
+    strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
+    sprintf(buffer, "<time>%s</time>", buffer);
+    f.println(buffer);
+    f.println("<extensions>");
+
+    f.println("<pvt:ext>");
+    sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading);
+    f.println(buffer);
+    sprintf(buffer, "<pvt:sog>%f</pvt:sog\n", sog.value);
+    f.println(buffer);
+    f.println("</pvt:ext>");
+
+    f.println("<imu:ext>");
+    sprintf(buffer, "<imu:hdg>%f</imu:hdg>", heading.heading);
+    f.println(buffer);
+    sprintf(buffer, "<imu:pitch>%f</imu:pitch>", attitude.pitch);
+    f.println(buffer);
+    sprintf(buffer, "<imu:roll>%f</imu:roll>", attitude.roll);
+    f.println(buffer);
+    sprintf(buffer, "<imu:rot>%f</imu:rot>", rateOfTurn.value);
+    f.println(buffer);
+    f.println("</imu:ext>");
+    sprintf(buffer, "<sea:awa>%f</sea:awa>", wind.angle);
+    f.println(buffer);
+    sprintf(buffer, "<sea:aws>%f</sea:aws>", wind.speed);
+    f.println(buffer);
+    sprintf(buffer, "<imu:roll>%f</imu:roll>", attitude.roll);
+    f.println(buffer);
+    f.println("<sea:ext>");
+
+    
+    f.println("</sea:ext>");
+    f.println("</extensions>");
+    f.println("</trkpt>");
+}

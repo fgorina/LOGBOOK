@@ -26,6 +26,7 @@
 
 #include "MenuScreen.h"
 #include "SDScreen.h"
+#include "RecordScreen.h"
 
 
 // NMEA 2000
@@ -78,20 +79,15 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 
 // Global variables + State
 
-static bool redrawData = true;
-static bool redrawDistance = true;
-static bool recording = false;
+
 static String wifi_ssid = "elrond";          // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // Store the password of the wireless network.
 static IPAddress signalk_tcp_host = IPAddress(192, 168, 1, 2);
 
-M5Display *tft;
 
-static long minutes = 0;
-static long miles_100 = 0;
 
 long lastTime = millis();
-
+static unsigned long last_message;
 static unsigned long last_touched;
 
 #define DISPLAY_ACTIVE 0
@@ -102,6 +98,11 @@ static int displaySaver = DISPLAY_ACTIVE;
 static char buffer[64];
 
 Screen *currentScreen = nullptr;
+// Test variables
+
+double speed = 5.0; // 5 knots
+double heading = 0.0; // In radians
+
 
 // State
 
@@ -111,14 +112,13 @@ tState *state{new tState()};
 
 Screen* screens[5] = {
    new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-  nullptr,
+  new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 10000),
   new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
   nullptr,
   nullptr
 
 };
 
-void updatedDateTime();
 boolean startWiFi();
 
 
@@ -166,61 +166,11 @@ boolean startWiFi()
       Serial.println("RTC already synced");
     }
 
-    updatedDateTime();
-    Serial.println(buffer);
 
     return true;
   }
   return false;
 }
-
-// Sorting functions
-
-// Function to update the date and time
-
-void updatedDateTime()
-{
-
-  struct tm timeinfo;
-  Serial.println("Getting RTC data");
-  if (getLocalTime(&timeinfo))
-  {
-    strftime(buffer, 64, "RTC %y-%m-%d %H:%M:%S", (const tm *)&timeinfo);
-  }
-  else
-  {
-    Serial.println("Failed RTC, getting from time");
-    time_t now = time(nullptr);
-    struct tm *ti = localtime(&now);
-    strftime(buffer, 64, "%y-%m-%d %H:%M:%S", ti);
-  }
-}
-
-void newFilename()
-{
-  time_t now = time(nullptr);
-  struct tm *timeinfo = localtime(&now);
-  strftime(buffer, sizeof(buffer), "/%y%m%d_%H%M.csv", timeinfo);
-}
-
-char *duration()
-{
-
-  int hours = floor(minutes / 60);
-  int mins = minutes - (hours * 60);
-  sprintf(buffer, "%d:%d", hours, mins);
-  return buffer;
-}
-
-char *distance()
-{
-
-  int miles = floor(miles_100 / 100);
-  int rest = miles_100 - (miles * 100);
-  sprintf(buffer, "%d.%d", miles, rest);
-  return buffer;
-}
-
 
 
 void HandleNMEA2000Msg(const tN2kMsg &N2kMsg){
@@ -293,6 +243,53 @@ void switchTo(int i){
       }
     }
 }
+
+void test_step(){
+  unsigned long m = millis();
+  if(M5.Touch.changed){
+    heading = heading + 10.0 / 180.0 * PI;
+  }
+  if (m - last_message > 500){
+    
+    
+    // Compute a distance. Speed = 5kt
+
+    double distance = 5.0 * 1852.0 * (m - last_message) / 3600000.0;  // distance in meters
+    Serial.println(distance);
+    // Compute a direction 
+    double dlat = distance * cos(heading);
+    double dlon = distance * sin(heading);
+
+    // Compute a new position
+    double lat = state->position.latitude + (dlat / 1852.0 / 60.0);
+    double lon = state->position.longitude + (dlon / (1852.0 * cos(state->position.latitude)) / 60.0);
+
+    // Set neew position
+    state->position.latitude = lat;
+    state->position.longitude = lon;
+    state->position.when = time(nullptr);
+    state->position.origin = 99;
+
+    // Set the cog and sog
+
+    state->cog.heading = heading;
+    state->cog.when = time(nullptr);
+    state->cog.origin = 99;
+
+    state->heading.heading = heading;
+    state->heading.when = time(nullptr);
+    state->heading.origin = 99;
+
+    state->sog.value = speed / 3600 * 1852.0;
+    state->sog.when = time(nullptr);
+    state->sog.origin = 99;
+
+    last_message = m;
+    
+  }
+
+
+}
 void setup()
 {
 
@@ -329,16 +326,18 @@ void loopTask()
 #define GO_SLEEP_TIMEOUT 60000ul // 5 '
 
 
-
 void loop()
 {
   //NMEA2000.ParseMessages();
+  
 
   if (!checkConnection())
   {
     startWiFi();
   }
   M5.update();
+  test_step();
+  
   loopTask();
   delay(5);
 }

@@ -2,11 +2,11 @@
 
 #ifndef _SDScreen_H_
 #define _SDScreen_H_
-#include <M5Tough.h>
+
 #include "Screen.h"
 
 #define  MAXFILES 100
-#define  MAXNAME  20
+#define  MAXNAME 20
 #define HEADER_SIZE  30
 #define  FILES_SCREEN  7
 
