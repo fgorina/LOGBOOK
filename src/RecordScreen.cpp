@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <M5Tough.h>
 
+
 RecordScreen::RecordScreen(int width, int height, const char *title, tState *state, time_t period) : Screen(width, height, title)
 {
     this->state = state;
@@ -44,15 +45,29 @@ void RecordScreen::draw()
 
 void RecordScreen::draw_distance()
 {
-
     M5.Lcd.setTextSize(1.5);
     M5.Lcd.fillRect(0, height - 80, width, 80, BLACK);
+    M5.Lcd.fillRect(0, 40, width/2, height, BLACK);
     M5.Lcd.setTextDatum(BL_DATUM);
     duration(buffer, MAXBUFFER);
     M5.Lcd.drawString(buffer, 10, height - 10);
-    M5.Lcd.setTextDatum(BL_DATUM);
+    M5.Lcd.setTextDatum(BR_DATUM);
     distance(buffer, MAXBUFFER);
     M5.Lcd.drawString(buffer, width - 10, height - 10);
+    // Now Show COG i SOG
+
+    M5.Lcd.setTextDatum(ML_DATUM);
+    snprintf(buffer, MAXBUFFER, "COG %03.0f º", state->cog.heading/PI*180.0);
+    M5.Lcd.drawString(buffer, 19, 75);
+
+    snprintf(buffer, MAXBUFFER, "SOG %03.1f kt", state->sog.value * 3600.0 / 1852.0);
+    M5.Lcd.drawString(buffer, 19, 100);
+
+    snprintf(buffer, MAXBUFFER, u8"AWA %03.0f º", state->wind.angle / PI * 180.0);
+    M5.Lcd.drawString(buffer, 19, 130);
+
+    snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->wind.speed * 3600.0 / 1852.0);
+    M5.Lcd.drawString(buffer, 19, 155);
 }
 
 void RecordScreen::draw_data()
@@ -61,17 +76,10 @@ void RecordScreen::draw_data()
     M5.Lcd.setTextSize(1);
     M5.Lcd.setTextDatum(TC_DATUM);
     M5.Lcd.fillRect(0, 0, width, 40, BLACK);
-    M5.Lcd.fillRect(0, 0, width/2, height-40, BLACK);
+    
     M5.Lcd.drawString(buffer, width / 2, 10);
 
-    // Now Show COG i SOG
-
-    M5.Lcd.setTextDatum(ML_DATUM);
-    snprintf(buffer, MAXBUFFER, "COG %03.0f", state->cog.heading/PI*180.0);
-    M5.Lcd.drawString(buffer, 19, 75);
-
-    snprintf(buffer, MAXBUFFER, "SOG %03.1f", state->sog.value * 3600.0 / 1852.0);
-    M5.Lcd.drawString(buffer, 19, 150);
+    
 
 }
 
@@ -146,7 +154,7 @@ void RecordScreen::startRecord()
     // We build a new filename
     newFilename(filename, LENNAME);
     file = SD.open(filename, FILE_WRITE);
-    file.println("Time\tLongitut\tLatitut\tCog\tSog\tHeading\tPitch\tRoll\tRot\tAwa\tAws");
+    saveHeader(file, filename);
     saveData(file);
     old_millis = millis();
 
@@ -162,6 +170,7 @@ void RecordScreen::stopRecord()
     // Close file
     brecord->setLabel("Start");
     saveData(file);
+    saveFooter(file);
     file.close();
     file = File();
     recording = false;
@@ -174,10 +183,11 @@ void RecordScreen::updatedDateTime()
    
     if (getLocalTime(&timeinfo))
     {
-        strftime(buffer, 64, "RTC %y-%m-%d %H:%M:%S", (const tm *)&timeinfo);
+        strftime(buffer, 64, "%d-%m-%y %H:%M:%S", (const tm *)&timeinfo);
     }
     else
     {
+        Serial.println("Problemes amb RTC");
         time_t now = time(nullptr);
         struct tm *ti = localtime(&now);
         strftime(buffer, 64, "%y-%m-%d %H:%M:%S", ti);
@@ -187,7 +197,12 @@ void RecordScreen::newFilename(char *buff, int maxbuff)
 {
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
-    strftime(buff, maxbuff, "/%y%m%d_%H%M.csv", timeinfo);
+    if(xmlFormat){
+        strftime(buff, maxbuff, "/%y%m%d_%H%M.gpx", timeinfo);
+    }else{
+        strftime(buff, maxbuff, "/%y%m%d_%H%M.csv", timeinfo);
+    }
+    
 }
 
 void RecordScreen::duration(char *buff, int bufsize)
@@ -223,6 +238,21 @@ double RecordScreen::haversine(double lat1, double lon1, double lat2, double lon
     double a = pow(sin(dLat / 2), 2) + pow(sin(dLon / 2), 2) * cos(lat1) * cos(lat2);
     double c = 2 * asin(sqrt(a));
     return R * c;
+}
+
+void  RecordScreen::saveHeader(File f, char* name){
+    if(xmlFormat){
+        state->saveGPXHeader(f, name);
+    }else{
+        file.println("Time\tLongitut\tLatitut\tCog\tSog\tHeading\tPitch\tRoll\tRot\tAwa\tAws");
+    }
+}
+
+void  RecordScreen::saveFooter(File f){
+
+     if(xmlFormat){
+        state->saveGPXFooter(f);
+    }
 }
 
 void RecordScreen::saveData(File f){

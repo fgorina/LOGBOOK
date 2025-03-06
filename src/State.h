@@ -38,7 +38,7 @@ public:
     
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};
     tDoubleData sog{when : 0, origin : 0, value : 0.0}; // Speed in m/s
-    tPositionData position{when : 0, origin : 0, latitude : 42.380118, longitude : 3.23328};
+    tPositionData position{when : 0, origin : 0, latitude : 42.428205, longitude : 3.165478};
     tHeadingData heading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
     tAttitudeData attitude{when : 0, origin : 0, yaw : 0.0, pitch : 0.0, roll : 0.0};
     tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // degrees/s
@@ -69,6 +69,8 @@ public:
     void printInfo();
     void saveCsv(File f);
     void saveGPXTrackpoint(File f);
+    void saveGPXHeader(File f, char* name);
+    void saveGPXFooter(File f);
 };
 
 #endif

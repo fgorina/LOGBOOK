@@ -50,6 +50,8 @@ class RecordScreen : public Screen
     void duration(char* buff, int bufsize);   
     void distance(char* buff, int bufsize);
     void saveData(File f);
+    void  saveHeader(File f, char* name);
+    void  saveFooter(File f);
     double haversine(double lat1, double lon1, double lat2, double lon2);   // Distances lox in Nm
 
 };

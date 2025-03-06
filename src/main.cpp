@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <M5Tough.h>
+#include <CUF_24.h>
 #include <time.h>
 #include <NMEA2000_esp32.h>
 #include <NMEA2000_CAN.h>
@@ -27,6 +28,8 @@
 #include "MenuScreen.h"
 #include "SDScreen.h"
 #include "RecordScreen.h"
+
+
 
 
 // NMEA 2000
@@ -80,7 +83,7 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 // Global variables + State
 
 
-static String wifi_ssid = "elrond";          // Store the name of the wireless network.
+static String wifi_ssid = "starlink_mini";          // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // Store the password of the wireless network.
 static IPAddress signalk_tcp_host = IPAddress(192, 168, 1, 2);
 
@@ -246,6 +249,7 @@ void switchTo(int i){
 
 void test_step(){
   unsigned long m = millis();
+  time_t t = time(nullptr);
   if(M5.Touch.changed){
     heading = heading + 10.0 / 180.0 * PI;
   }
@@ -254,7 +258,7 @@ void test_step(){
     
     // Compute a distance. Speed = 5kt
 
-    double distance = 5.0 * 1852.0 * (m - last_message) / 3600000.0;  // distance in meters
+    double distance = 5.0 * 1852.0 * ((m - last_message) / 3600000.0);  // distance in meters
     Serial.println(distance);
     // Compute a direction 
     double dlat = distance * cos(heading);
@@ -262,12 +266,12 @@ void test_step(){
 
     // Compute a new position
     double lat = state->position.latitude + (dlat / 1852.0 / 60.0);
-    double lon = state->position.longitude + (dlon / (1852.0 * cos(state->position.latitude)) / 60.0);
+    double lon = state->position.longitude + (dlon / (1852.0 * cos(state->position.latitude / 180.0 * PI)) / 60.0);
 
     // Set neew position
     state->position.latitude = lat;
     state->position.longitude = lon;
-    state->position.when = time(nullptr);
+    state->position.when = t;
     state->position.origin = 99;
 
     // Set the cog and sog
@@ -277,12 +281,18 @@ void test_step(){
     state->cog.origin = 99;
 
     state->heading.heading = heading;
-    state->heading.when = time(nullptr);
+    state->heading.when = t;
     state->heading.origin = 99;
 
     state->sog.value = speed / 3600 * 1852.0;
-    state->sog.when = time(nullptr);
+    state->sog.when = t;
     state->sog.origin = 99;
+
+    state->wind.angle = (60.0 + random(-5, 5) )/ 180.0 * PI;
+    state->wind.speed = 15.0 +random(-5, 5) * 1852.0 / 3600.0;
+    state->wind.when = t;
+    state->wind.origin = 99;
+    state->wind.reference = tN2kWindReference::N2kWind_Apparent;
 
     last_message = m;
     
@@ -296,7 +306,7 @@ void setup()
   M5.begin();
   Serial.begin(115200);
   SD.begin();
-
+  M5.Lcd.setFreeFont(&unicode_24px);
   setup_NMEA2000();
 
   last_touched = millis();

@@ -641,18 +641,22 @@ void tState::saveCsv(File f){
 void tState::saveGPXTrackpoint(File f){
     char buffer[100];
     struct tm timeinfo;
+
+   
+    if (!getLocalTime(&timeinfo)){
+        Serial.println("No tinc dades de temps");
+    }
     
-    sprintf(buffer, "<trkpt lat=\"%f\" lon=\"%f\">", position.longitude, position.latitude );
+    sprintf(buffer, "<trkpt lat=\"%f\" lon=\"%f\">", position.latitude, position.longitude );
     f.println(buffer);
-    strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
-    sprintf(buffer, "<time>%s</time>", buffer);
+    strftime(buffer, 64, "<time>%Y-%m-%dT%H:%M:%SZ</time>", (const tm *)&timeinfo);
     f.println(buffer);
     f.println("<extensions>");
 
     f.println("<pvt:ext>");
     sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading);
     f.println(buffer);
-    sprintf(buffer, "<pvt:sog>%f</pvt:sog\n", sog.value);
+    sprintf(buffer, "<pvt:sog>%f</pvt:sog>", sog.value);
     f.println(buffer);
     f.println("</pvt:ext>");
 
@@ -666,16 +670,34 @@ void tState::saveGPXTrackpoint(File f){
     sprintf(buffer, "<imu:rot>%f</imu:rot>", rateOfTurn.value);
     f.println(buffer);
     f.println("</imu:ext>");
+    f.println("<sea:ext>");
     sprintf(buffer, "<sea:awa>%f</sea:awa>", wind.angle);
     f.println(buffer);
     sprintf(buffer, "<sea:aws>%f</sea:aws>", wind.speed);
     f.println(buffer);
-    sprintf(buffer, "<imu:roll>%f</imu:roll>", attitude.roll);
-    f.println(buffer);
     f.println("<sea:ext>");
-
-    
-    f.println("</sea:ext>");
     f.println("</extensions>");
     f.println("</trkpt>");
+}
+
+void tState::saveGPXHeader(File f, char* name){
+f.println("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+f.println("<gpx xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"");
+f.println("xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.cluetrust.com/XML/GPXDATA/1/0 http://www.cluetrust.com/Schemas/gpxdata10.xsd\"");
+
+f.println("xmlns:gpxdata=\"http://www.cluetrust.com/XML/GPXDATA/1/0\" version=\"1.1\"");
+f.println("xmlns:pvt=\"file:///Users/fgorina/Documents/Varis/pvt.xsd\"");
+f.println("xmlns:imu=\"file:///Users/fgorina/Documents/Varis/imu.xsd\"");
+f.println("xmlns:sea=\"file:///Users/fgorina/Documents/Varis/sea.xsd\"");
+f.println("xmlns=\"http://www.topografix.com/GPX/1/1\">");
+
+f.println("<trk>");
+f.print("<name>");
+f.print(name);
+f.println("</name>");
+f.println("<trkseg>");
+}
+
+void tState::saveGPXFooter(File f){
+    f.println("</trkseg>\n</trk>\n</gpx>");
 }
