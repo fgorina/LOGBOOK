@@ -5,6 +5,7 @@
 #define ESP32_CAN_RX_PIN GPIO_NUM_27
 
 #include <Arduino.h>
+#include <WebServer.h>
 #include <M5Tough.h>
 #include <CUF_24.h>
 #include <time.h>
@@ -29,11 +30,7 @@
 #include "SDScreen.h"
 #include "RecordScreen.h"
 
-
-
-
 // NMEA 2000
-
 
 bool analyze = false;
 bool verbose = false;
@@ -78,16 +75,14 @@ const unsigned char AutopilotDeviceClass = 40;     // Steering and Control Surfa
 const uint16_t AutopilotManufacturerCode = 1851;   // Raymarine
 const unsigned char AutopilotIndustryGroup = 4;    // Marine
 
-
-
 // Global variables + State
 
-
-static String wifi_ssid = "starlink_mini";          // Store the name of the wireless network.
+static String wifi_ssid = "starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // Store the password of the wireless network.
 static IPAddress signalk_tcp_host = IPAddress(192, 168, 1, 2);
 
-
+// Http Server
+WebServer server(80);
 
 long lastTime = millis();
 static unsigned long last_message;
@@ -103,9 +98,8 @@ static char buffer[64];
 Screen *currentScreen = nullptr;
 // Test variables
 
-double speed = 5.0; // 5 knots
+double speed = 5.0;   // 5 knots
 double heading = 0.0; // In radians
-
 
 // State
 
@@ -113,17 +107,141 @@ tState *state{new tState()};
 
 // Screens
 
-Screen* screens[5] = {
-   new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-  new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 10000),
-  new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-  nullptr,
-  nullptr
+Screen *screens[5] = {
+    new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
+    new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 10000),
+    new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
+    nullptr,
+    nullptr
 
 };
 
 boolean startWiFi();
+// Web server handlers
 
+String getContentType(String filename)
+{
+  if (server.hasArg("download"))
+  {
+    return "application/octet-stream";
+  }
+  else if (filename.endsWith(".htm"))
+  {
+    return "text/html";
+  }
+  else if (filename.endsWith(".html"))
+  {
+    return "text/html";
+  }
+  else if (filename.endsWith(".css"))
+  {
+    return "text/css";
+  }
+  else if (filename.endsWith(".js"))
+  {
+    return "application/javascript";
+  }
+  else if (filename.endsWith(".png"))
+  {
+    return "image/png";
+  }
+  else if (filename.endsWith(".gif"))
+  {
+    return "image/gif";
+  }
+  else if (filename.endsWith(".jpg"))
+  {
+    return "image/jpeg";
+  }
+  else if (filename.endsWith(".ico"))
+  {
+    return "image/x-icon";
+  }
+  else if (filename.endsWith(".xml"))
+  {
+    return "text/xml";
+  }
+  else if (filename.endsWith(".pdf"))
+  {
+    return "application/x-pdf";
+  }
+  else if (filename.endsWith(".zip"))
+  {
+    return "application/x-zip";
+  }
+  else if (filename.endsWith(".gz"))
+  {
+    return "application/x-gzip";
+  }
+  else if (filename.endsWith(".gpx"))
+  {
+    return "application/gpx+xml";
+  }
+  else if (filename.endsWith(".csv"))
+  {
+    return "text/plain";
+  }
+  return "text/plain";
+}
+
+bool handleFileRead(String path)
+{
+
+  if (path.endsWith("/"))
+  {
+    path += "index.htm";
+  }
+
+  if (!SD.exists(path))
+  {
+    Serial.println("File " + path + " not found.");
+    server.send(404, "text/plain", "FileNotFound");
+    return false;
+  }
+
+  Serial.println("handleFileRead: " + path);
+  String contentType = getContentType(path);
+
+  File file = SD.open(path, FILE_READ);
+  if (file)
+  {
+    server.streamFile(file, contentType);
+    file.close();
+    return true;
+  }
+  else
+  {
+    Serial.println("File " + path + " not found.");
+    return false;
+  }
+}
+
+void handleFileList()
+{
+  Serial.println("handleFileList");
+
+  File root = SD.open("/");
+
+  String output = "<htlm><head><title>Logs</title></head><body>\n";
+  output += "<h1>Logs</h1>\n";
+  output += "<ul>\n"; 
+  if (root.isDirectory())
+  {
+    File file = root.openNextFile();
+    while (file)
+    {
+      if (file.name()[0] != '.')
+      {
+        output += String("<li><a href=\"") + file.path() + String("\">") + file.name() + "</a></li>\n";
+      }
+
+      file = root.openNextFile();
+    }
+  }
+  
+  output += "</ul>\n";
+  server.send(200, "text/html", output);
+}
 
 // WiFI
 boolean checkConnection()
@@ -169,14 +287,23 @@ boolean startWiFi()
       Serial.println("RTC already synced");
     }
 
+    // Now start Web Server
+    server.on("/list", HTTP_GET, handleFileList);
+    server.onNotFound([]()
+                      {
+      if (!handleFileRead(server.uri())) {
+        server.send(404, "text/plain", "FileNotFound");
+      } });
 
+    server.begin();
+    Serial.println("HTTP server started");
     return true;
   }
   return false;
 }
 
-
-void HandleNMEA2000Msg(const tN2kMsg &N2kMsg){
+void HandleNMEA2000Msg(const tN2kMsg &N2kMsg)
+{
   state->HandleNMEA2000Msg(N2kMsg, analyze, verbose);
 }
 
@@ -229,38 +356,45 @@ void setup_NMEA2000()
 
 // Menu Management
 
-void switchTo(int i){
-  Screen* oldScreen = currentScreen;
+void switchTo(int i)
+{
+  Screen *oldScreen = currentScreen;
 
-    if(i >= 0 && i < 5){
-      if (screens[i] != nullptr){
-       if(oldScreen != nullptr){
-         oldScreen->exit();
-        }
-        currentScreen = screens[i];
-        currentScreen->enter();
-      }else{
-        Serial.print("Screen ");
-        Serial.print(i);
-        Serial.println(" not implemented");
+  if (i >= 0 && i < 5)
+  {
+    if (screens[i] != nullptr)
+    {
+      if (oldScreen != nullptr)
+      {
+        oldScreen->exit();
       }
+      currentScreen = screens[i];
+      currentScreen->enter();
     }
+    else
+    {
+      Serial.print("Screen ");
+      Serial.print(i);
+      Serial.println(" not implemented");
+    }
+  }
 }
 
-void test_step(){
+void test_step()
+{
   unsigned long m = millis();
   time_t t = time(nullptr);
-  if(M5.Touch.changed){
+  if (M5.Touch.changed)
+  {
     heading = heading + 10.0 / 180.0 * PI;
   }
-  if (m - last_message > 500){
-    
-    
+  if (m - last_message > 500)
+  {
+
     // Compute a distance. Speed = 5kt
 
-    double distance = 5.0 * 1852.0 * ((m - last_message) / 3600000.0);  // distance in meters
-    Serial.println(distance);
-    // Compute a direction 
+    double distance = 5.0 * 1852.0 * ((m - last_message) / 3600000.0); // distance in meters
+    // Compute a direction
     double dlat = distance * cos(heading);
     double dlon = distance * sin(heading);
 
@@ -288,17 +422,14 @@ void test_step(){
     state->sog.when = t;
     state->sog.origin = 99;
 
-    state->wind.angle = (60.0 + random(-5, 5) )/ 180.0 * PI;
-    state->wind.speed = 15.0 +random(-5, 5) * 1852.0 / 3600.0;
+    state->wind.angle = (60.0 + random(-5, 5)) / 180.0 * PI;
+    state->wind.speed = 15.0 + random(-5, 5) * 1852.0 / 3600.0;
     state->wind.when = t;
     state->wind.origin = 99;
     state->wind.reference = tN2kWindReference::N2kWind_Apparent;
 
     last_message = m;
-    
   }
-
-
 }
 void setup()
 {
@@ -311,43 +442,42 @@ void setup()
 
   last_touched = millis();
 
-  //M5.Lcd.wakeup();
+  // M5.Lcd.wakeup();
   Serial.println("Entering Menu Screen");
-  
-  //currentScreen = new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs");
+
+  // currentScreen = new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs");
   currentScreen = screens[0];
   currentScreen->enter();
-
 }
 void loopTask()
 {
 
-  if(currentScreen != nullptr){
+  if (currentScreen != nullptr)
+  {
     int newScreen = currentScreen->run();
 
-    if (newScreen >= 0 && newScreen < 5){
+    if (newScreen >= 0 && newScreen < 5)
+    {
       Serial.println("About to switch");
       switchTo(newScreen);
     }
   }
-  
 }
 
 #define GO_SLEEP_TIMEOUT 60000ul // 5 '
 
-
 void loop()
 {
-  //NMEA2000.ParseMessages();
-  
+  // NMEA2000.ParseMessages();
 
   if (!checkConnection())
   {
     startWiFi();
   }
   M5.update();
+  server.handleClient();
   test_step();
-  
+
   loopTask();
   delay(5);
 }

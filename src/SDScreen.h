@@ -18,7 +18,8 @@ class SDScreen : public Screen
     void exit();
     void draw();
     int run();
-
+    bool exists(const char* name);
+    
     protected: 
     
     char sd_files[MAXFILES][MAXNAME];
@@ -36,6 +37,8 @@ class SDScreen : public Screen
     void drawFile(int file, bool selected);
     void drawSD();
     void do_select_file();
+    
+
 
 };
 

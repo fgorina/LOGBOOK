@@ -184,3 +184,12 @@ void SDScreen::do_select_file()
     }
   }
 }
+
+bool SDScreen::exists(const char* name){
+  for(int i = 0; i < n_files; i++){
+    if (strncmp(sd_files[i], name, MAXNAME) == 0){
+      return true;
+    }
+  }
+  return false;
+}

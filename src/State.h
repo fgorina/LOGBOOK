@@ -6,6 +6,7 @@
 #include "NMEA2000.h"
 #include "N2kTypes.h"
 #include "PyTypes.h"
+#include <ArduinoJson.h>
 
 
 class tState
@@ -15,6 +16,7 @@ protected:
     bool verbose = false;
 
     void setupTime(time_t t);
+    void setupTimeSK(String datetime);
     void handleSystemDateTime(const tN2kMsg &N2kMsg);
     void handleHeadingTrackControl(const tN2kMsg &N2kMsg);
     void handleNavigationInfo(const tN2kMsg &N2kMsg);
@@ -34,10 +36,15 @@ protected:
                                    tN2kNavigationDirection &NavDirection, char *RouteName, size_t RouteNameBufSize, tN2kGenericStatusPair &SupplementaryData,
                                    uint16_t wptArraySize, t_waypoint *waypoints);
 
+    bool parseObj(JsonObject obj);
+    void update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVariant &value);
+    
 public:
     
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};
     tDoubleData sog{when : 0, origin : 0, value : 0.0}; // Speed in m/s
+    tDoubleData stw{when : 0, origin : 0, value : 0.0}; // Speed through water in m/s
+    tDoubleData depth{when : 0, origin : 0, value : 0.0}; // Depth in m
     tPositionData position{when : 0, origin : 0, latitude : 42.428205, longitude : 3.165478};
     tHeadingData heading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
     tAttitudeData attitude{when : 0, origin : 0, yaw : 0.0, pitch : 0.0, roll : 0.0};
@@ -45,8 +52,12 @@ public:
     tDoubleData deviation{when : 0, origin : 0, value : 0.0};
     tDoubleData variation{when : 0, origin : 0, value : 0.0};
     tDoubleData rudderAngle{when : 0, origin : 0, value : 0.0};     // rudder.angle
-    tWindData wind{when : 0, origin : 0, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
-
+    tWindData wind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
+    tDoubleData rpm{when : 0, origin : 0, value : 0.0}; // RPM
+    tDoubleData engineTemperature{when : 0, origin : 0, value : 0.0}; // Engine Temperature
+    tDoubleData oilPressure{when : 0, origin : 0, value : 0.0}; // Engine Temperature
+    
+    
     // RW , Commands and data - Not used for the moment
     tModeData mode{when : 0, origin : 0, value : tPyPilotMode::compass}; // ap.mode
     tBoolData engaged{when : 0, origin : 0, value : false};              // ap.enabled
@@ -71,6 +82,7 @@ public:
     void saveGPXTrackpoint(File f);
     void saveGPXHeader(File f, char* name);
     void saveGPXFooter(File f);
+    bool signalk_parse_ws(String msg);
 };
 
 #endif
