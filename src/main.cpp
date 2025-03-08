@@ -13,6 +13,8 @@
 #include <NMEA2000_CAN.h>
 #include <N2kMessages.h>
 #include "N2kDeviceList.h"
+#include <ArduinoWebsockets.h>
+#include "net_signalk.h"
 
 #include "PyTypes.h"
 
@@ -20,7 +22,9 @@
 #include <WiFiUdp.h>
 #include <ESPmDNS.h>
 #include <HTTPClient.h>
+
 #include "State.h"
+
 
 #include <SD.h>
 
@@ -104,6 +108,13 @@ double heading = 0.0; // In radians
 // State
 
 tState *state{new tState()};
+
+// SignalK server
+
+const char* skServer = "192.168.1.2";
+const int skPort = 3000;
+
+NetSignalkWS *skWsServer = new NetSignalkWS(  skServer, skPort, state);
 
 // Screens
 
@@ -286,6 +297,13 @@ boolean startWiFi()
     {
       Serial.println("RTC already synced");
     }
+
+    // Try to connect to signalk
+
+    if (strlen(skServer) > 0 && skPort > 0) {
+      skWsServer->begin();  // Connect to the SignalK TCP server
+    }
+
 
     // Now start Web Server
     server.on("/list", HTTP_GET, handleFileList);

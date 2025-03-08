@@ -3,10 +3,12 @@
 #ifndef _State_H_
 #define _State_H_
 
+#include <SD.h>
 #include "NMEA2000.h"
 #include "N2kTypes.h"
 #include "PyTypes.h"
 #include <ArduinoJson.h>
+
 
 
 class tState
