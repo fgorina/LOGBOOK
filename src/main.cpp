@@ -81,9 +81,9 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 
 // Global variables + State
 
-static String wifi_ssid = "starlink_mini";   // Store the name of the wireless network.
+static String wifi_ssid = "Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // Store the password of the wireless network.
-static IPAddress signalk_tcp_host = IPAddress(192, 168, 1, 2);
+//static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
 
 // Http Server
 WebServer server(80);
@@ -109,20 +109,21 @@ double heading = 0.0; // In radians
 
 tState *state{new tState()};
 
+String myIp = "Connecting...";
+
 // SignalK server
 
-const char* skServer = "192.168.1.2";
+const char* skServer = "192.168.1.2"; // "192.168.1.204";
 const int skPort = 3000;
 
 NetSignalkWS *skWsServer = new NetSignalkWS(  skServer, skPort, state);
 
 // Screens
 
-Screen *screens[5] = {
+Screen *screens[4] = {
     new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-    new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 10000),
+    new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 1000),
     new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-    nullptr,
     nullptr
 
 };
@@ -286,6 +287,7 @@ boolean startWiFi()
     Serial.print(wifi_ssid);
     Serial.print(" IP ");
     Serial.println(WiFi.localIP());
+    myIp = WiFi.localIP().toString();
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo) || timeinfo.tm_year < 20)
@@ -315,6 +317,8 @@ boolean startWiFi()
 
     server.begin();
     Serial.println("HTTP server started");
+
+    currentScreen->draw();
     return true;
   }
   return false;
@@ -457,7 +461,7 @@ void setup()
   SD.begin();
   M5.Lcd.setFreeFont(&unicode_24px);
   setup_NMEA2000();
-
+  
   last_touched = millis();
 
   // M5.Lcd.wakeup();
@@ -494,7 +498,8 @@ void loop()
   }
   M5.update();
   server.handleClient();
-  test_step();
+  skWsServer->run();
+  //test_step();
 
   loopTask();
   delay(5);

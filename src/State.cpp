@@ -28,6 +28,7 @@ void tState::setupTime(time_t t)
   RTCDate.Month = tm->tm_mon + 1;
   RTCDate.Date = tm->tm_mday;
   M5.Rtc.SetDate(&RTCDate);
+  timeSet = true;
 }
 
 void tState::setupTimeSK(String datetime)
@@ -45,6 +46,7 @@ void tState::setupTimeSK(String datetime)
   RTCtime.Minutes = atoi(datetime.substring(14, 16).c_str());
   RTCtime.Seconds = atoi(datetime.substring(17, 19).c_str());
   M5.Rtc.SetTime(&RTCtime); // writes the  time to the (RTC) real time clock.
+  timeSet = true;
 }
 /* NMEA 2000 support */
 
@@ -916,9 +918,10 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
       if (value.is<String>())
       {
         String val = value.as<String>();
-        if (val != NULL)
+        if (val != NULL && !timeSet)
         {
           setupTimeSK(val);
+         
         }
       }
     }

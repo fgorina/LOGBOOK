@@ -2,6 +2,9 @@
 #include "MenuScreen.h"
 #include <M5Tough.h>
 #include "Arduino.h"
+#include <WiFi.h>
+
+
 
 MenuScreen::MenuScreen(int width, int height, const char *title) : Screen(width, height, title)
 {
@@ -20,10 +23,10 @@ void MenuScreen::enter()
     ButtonColors off_clrs = {BLACK, CYAN, WHITE};
     ButtonColors selected_clrs = {RED, WHITE, WHITE};
 
-    brecord = new Button(width / 4, 10, width / 2, 50, false, "Gravar", off_clrs, on_clrs, MC_DATUM);
-    bfiles = new Button(width / 4, 70, width / 2, 50, false, "Logs", off_clrs, on_clrs, MC_DATUM);
-    binspector = new Button(width / 4, 130, width / 2, 50, false, "Inspector", off_clrs, on_clrs, MC_DATUM);
-    bweb = new Button(width / 4, 190, width / 2, 50, false, "Web", off_clrs, on_clrs, MC_DATUM);
+    brecord = new Button(width / 4, 50, width / 2, 50, false, "Gravar", off_clrs, on_clrs, MC_DATUM);
+    bfiles = new Button(width / 4, 110, width / 2, 50, false, "Logs", off_clrs, on_clrs, MC_DATUM);
+    binspector = new Button(width / 4, 170, width / 2, 50, false, "Inspector", off_clrs, on_clrs, MC_DATUM);
+   
 
     draw();
 }
@@ -56,29 +59,20 @@ void MenuScreen::exit()
         binspector = nullptr;
     }
 
-    if (bweb != nullptr)
-    {
-        bweb->delHandlers();
-        bweb->hide(BLACK);
-        delete (bweb);
-        bweb = nullptr;
-    }
-    Serial.println(brecord == nullptr);
-    Serial.println(bfiles == nullptr);
-    Serial.println(binspector == nullptr);
-    Serial.println(bweb == nullptr);
-    Serial.println("================");
+  
 }
 void MenuScreen::draw()
 {
     Serial.println("MenuScreen::draw");
     M5.Lcd.clear();
-    if (brecord != nullptr && bfiles != nullptr && binspector != nullptr && bweb != nullptr)
+
+    M5.Lcd.setTextDatum(TC_DATUM);
+    M5.Lcd.drawString( WiFi.localIP().toString(), width / 2, 10);
+    if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
     {
         brecord->draw();
         bfiles->draw();
         binspector->draw();
-        bweb->draw();
     }
     // M5.Buttons.draw();
     Serial.println("Exit MenuScreen::draw");
@@ -104,15 +98,7 @@ int MenuScreen::run()
         Serial.println("Inspecting");
         return (3);
     }
-    if (bweb != nullptr)
-    {
-        if (bweb->wasReleased())
-        {
-            // Goto web
-            Serial.println("Web Transfer");
-            return (4);
-        }
-    }
+    
 
     return -1;
 }

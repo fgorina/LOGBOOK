@@ -13,9 +13,9 @@ void SDScreen::enter()
   ButtonColors off_clrs = {BLACK, CYAN, WHITE};
   ButtonColors selected_clrs = {RED, WHITE, WHITE};
 
-  brecord = new Button(width / 2 + width / 8, height / 2 - 30, width / 4, 60, false, "Exit", off_clrs, on_clrs, MC_DATUM);
-  bup = new Button(width / 2 + width / 8, 10, width / 4, 60, false, "^", off_clrs, on_clrs, MC_DATUM);
-  bdown = new Button(width / 2 + width / 8, height - 70, width / 4, 60, false, "v", off_clrs, on_clrs, MC_DATUM);
+  brecord = new Button(width / 2 + width / 6, height / 2 - 30, width / 4, 60, false, "Exit", off_clrs, on_clrs, MC_DATUM);
+  bup = new Button(width / 2 + width / 6, 10, width / 4, 60, false, "^", off_clrs, on_clrs, MC_DATUM);
+  bdown = new Button(width / 2 + width / 6, height - 70, width / 4, 60, false, "v", off_clrs, on_clrs, MC_DATUM);
 
   draw();
 }

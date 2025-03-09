@@ -25,7 +25,7 @@ class MenuScreen : public Screen
     Button *brecord = nullptr;
     Button *bfiles= nullptr;
     Button *binspector = nullptr;
-    Button *bweb = nullptr;
+
 
 };
 

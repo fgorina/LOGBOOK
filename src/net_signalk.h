@@ -13,6 +13,10 @@ protected:
   const char *host;
   int port;
   tState *state;
+  unsigned long lastMillis = 0;
+  unsigned long timeout = 10000;
+
+  char buff[300];
 
   void onWsEventsCallback(WebsocketsEvent event, String data);
   void onWsMessageCallback(WebsocketsMessage message);
@@ -20,8 +24,9 @@ protected:
 public:
   NetSignalkWS(const char *host, int port, tState* state);
   bool connect();
-  void ws_signalk_subscribe();
+  void subscribe();
   void begin();
+  void run();
 };
 
 #endif

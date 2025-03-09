@@ -95,7 +95,6 @@ int RecordScreen::run()
         
         if (millis() - old_millis > period)
         {
-            Serial.print("*");
             old_millis = millis();
             double lat2 = state->position.latitude;
             double lon2 = state->position.longitude;
@@ -111,10 +110,6 @@ int RecordScreen::run()
                 old_lat = lat2;
                 old_lon = lon2;
                 draw_distance();
-            }else{
-                Serial.println("");
-                Serial.print(lat2); Serial.print(" "); Serial.print(lon2); Serial.print(" ");
-                Serial.println(distance);
             }
         }
     }
@@ -183,7 +178,7 @@ void RecordScreen::updatedDateTime()
    
     if (getLocalTime(&timeinfo))
     {
-        strftime(buffer, 64, "%d-%m-%y %H:%M:%S", (const tm *)&timeinfo);
+        strftime(buffer, 64, "UTC %d-%m-%y %H:%M:%S", (const tm *)&timeinfo);
     }
     else
     {

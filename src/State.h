@@ -16,6 +16,7 @@ class tState
 protected:
 
     bool verbose = false;
+    bool timeSet = false;
 
     void setupTime(time_t t);
     void setupTimeSK(String datetime);

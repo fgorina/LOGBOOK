@@ -6,7 +6,7 @@ void NetSignalkWS::onWsEventsCallback(WebsocketsEvent event, String data)
     if (event == WebsocketsEvent::ConnectionOpened)
     {
         Serial.println("Wss Connnection Opened");
-        // wsskClient.lastActivity = millis();
+        lastMillis = millis();
     }
     else if (event == WebsocketsEvent::ConnectionClosed)
     {
@@ -37,6 +37,7 @@ void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
     // Serial.print("Got Message: ");
     // Serial.println(message.data());
     // wsskClient.lastActivity = millis();
+    lastMillis = millis();
     bool found = state->signalk_parse_ws(message.data());
     if (!found)
     {
@@ -44,7 +45,7 @@ void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
     }
 }
 
-NetSignalkWS::NetSignalkWS(const char *host, int port, tState* state)
+NetSignalkWS::NetSignalkWS(const char *host, int port, tState *state)
 {
     this->state = state;
     this->host = host;
@@ -62,51 +63,75 @@ void ws_signalk_greet(WiFiClient& client) {
 }
 */
 
-bool NetSignalkWS::connect(){
-
-    if (client == nullptr  || !client->available())
+bool NetSignalkWS::connect()
+{
+    if (strlen(host) > 0 && port > 0)
     {
-
-        char buff[100];
-
-        client = new WebsocketsClient();
-        client->onMessage([this](WebsocketsMessage message) { this->onWsMessageCallback(message); });
-        client->onEvent([this](WebsocketsEvent event, String data) { this->onWsEventsCallback(event, data); });
-        sprintf(buff, "ws://%s:%d/signalk/v1/stream", host, port);
-        Serial.print("Reconnecting to ");
-        Serial.println(buff);
-        if (client->connect(String(buff)))
+        if (client == nullptr || !client->available())
         {
-            Serial.println("Ws conection opened");
-            return true;
-            // signalk_greet(client.c);
+            client = new WebsocketsClient();
+            client->onMessage([this](WebsocketsMessage message)
+                              { this->onWsMessageCallback(message); });
+            client->onEvent([this](WebsocketsEvent event, String data)
+                            { this->onWsEventsCallback(event, data); });
+            sprintf(buff, "ws://%s:%d/signalk/v1/stream", host, port);
+            Serial.print("Reconnecting to ");
+            Serial.println(buff);
+            if (client->connect(String(buff)))
+            {
+                Serial.println("Ws conection opened");
+                lastMillis = millis();
+                return true;
+                // signalk_greet(client.c);
+            }
+            else
+            {
+
+                Serial.println("Cannot connect");
+                return false;
+            }
         }
         else
-        {   
-
-            Serial.println("Cannot connect");
-            return false;
+        {
+            return true;
         }
-    }else{
-        
-        return true;
     }
 };
 
-
- void ws_signalk_subscribe() {
-   
- }
-  
-
- 
-
+void NetSignalkWS::subscribe()
+{
+}
 
 void NetSignalkWS::begin()
 {
 
     bool ok = connect();
-    
+
     Serial.print(" Status ");
     Serial.println(ok);
+}
+
+void NetSignalkWS::run()
+{
+
+    if (client != nullptr)
+    {
+        if (millis() - lastMillis > timeout && false)
+        {
+            Serial.println("Timeout");
+            client->close();
+            delete client;
+            client = nullptr;
+            lastMillis = millis();
+            connect();
+        }
+        else
+        {
+            client->poll();
+        }
+    }
+    else
+    {
+        connect();
+    }
 }
