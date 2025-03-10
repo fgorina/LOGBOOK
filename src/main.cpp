@@ -81,8 +81,8 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 
 // Global variables + State
 
-static String wifi_ssid = "Yamato"; //"starlink_mini";   // Store the name of the wireless network.
-static String wifi_password = "ailataN1991"; // Store the password of the wireless network.
+static String wifi_ssid = " Yamato"; //"TP-LINK_2695";//Yamato"; //"starlink_mini";   // Store the name of the wireless network.
+static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
 //static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
 
 // Http Server
@@ -113,7 +113,7 @@ String myIp = "Connecting...";
 
 // SignalK server
 
-const char* skServer = "192.168.1.2"; // "192.168.1.204";
+const char* skServer =  "192.168.1.2";//"192.168.1.54"; 
 const int skPort = 3000;
 
 NetSignalkWS *skWsServer = new NetSignalkWS(  skServer, skPort, state);

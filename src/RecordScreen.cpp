@@ -109,8 +109,9 @@ int RecordScreen::run()
                 miles += distance;
                 old_lat = lat2;
                 old_lon = lon2;
-                draw_distance();
+               
             }
+            draw_distance();
         }
     }
     if (brecord != nullptr && brecord->wasReleased())

@@ -16,6 +16,7 @@ void NetSignalkWS::onWsEventsCallback(WebsocketsEvent event, String data)
         Serial.print("Close Reason:");
         Serial.println(reason);
         Serial.println(data);
+        started = false;
     }
     else if (event == WebsocketsEvent::GotPing)
     {
@@ -33,16 +34,20 @@ void NetSignalkWS::onWsEventsCallback(WebsocketsEvent event, String data)
 
 void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
 {
-
+    if(!started){
+        subscribe();
+        started = true;
+    }
     // Serial.print("Got Message: ");
     // Serial.println(message.data());
     // wsskClient.lastActivity = millis();
     lastMillis = millis();
-    Serial.println(message.data());
+    //Serial.println(message.data());
     bool found = state->signalk_parse_ws(message.data());
     if (!found)
     {
-        //Serial.println(message.data());
+        Serial.print("Not Processed: ");
+        Serial.println(message.data());
     }
 }
 
@@ -55,10 +60,9 @@ NetSignalkWS::NetSignalkWS(const char *host, int port, tState *state)
 
 
 void NetSignalkWS::greet() {
+ 
 
-  const char* data = "{\"context\": \"\",\"subscribe\": [{\"path\": \"environment.wind.angleApparent\", \"policy\":\"instant\"}, {\"path\": \"environment.wind.speedApparent\", \"policy\":\"instant\"}]}\n";
-  client->send(data);
-  Serial.println("Sent Subscribe");
+  
 }
 
 
@@ -101,6 +105,15 @@ bool NetSignalkWS::connect()
 
 void NetSignalkWS::subscribe()
 {
+  const char* data = "{\"context\": \"\",\"subscribe\": [{\"path\": \"environment.wind.angleApparent\", \"policy\":\"instant\"},"
+  "{\"path\": \"environment.wind.speedApparent\", \"policy\":\"instant\"},"
+   "{\"path\": \"navigation.headingMagnetic\", \"policy\":\"instant\"},"
+    "{\"path\": \"navigation.position\", \"policy\":\"instant\"},"
+    "{\"path\": \"navigation.speedOverGround\", \"policy\":\"instant\"},"
+    "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"}"
+  "]}\n";
+  client->send(data);
+  Serial.println("Sent Subscribe");
 }
 
 void NetSignalkWS::begin()

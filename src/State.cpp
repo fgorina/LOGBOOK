@@ -943,6 +943,7 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
           wind.origin = -1;
           wind.angle = value.as<float>();
           wind.reference = tN2kWindReference::N2kWind_Apparent;
+          
         }
       }
       else if (strcmp(w, "angleTrueGround") == 0)
@@ -971,6 +972,7 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
           wind.origin = -1;
           wind.speed = value.as<float>();
           wind.reference = tN2kWindReference::N2kWind_Apparent;
+          
         }
       }
       else if (strcmp(w, "speedOverGround") == 0)
