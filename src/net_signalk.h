@@ -15,6 +15,7 @@ protected:
   tState *state;
   unsigned long lastMillis = 0;
   unsigned long timeout = 10000;
+  bool started = false;
 
   char buff[300];
 
@@ -25,6 +26,7 @@ public:
   NetSignalkWS(const char *host, int port, tState* state);
   bool connect();
   void subscribe();
+  void greet();
   void begin();
   void run();
 };

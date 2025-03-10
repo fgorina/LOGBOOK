@@ -38,10 +38,11 @@ void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
     // Serial.println(message.data());
     // wsskClient.lastActivity = millis();
     lastMillis = millis();
+    Serial.println(message.data());
     bool found = state->signalk_parse_ws(message.data());
     if (!found)
     {
-        Serial.println(message.data());
+        //Serial.println(message.data());
     }
 }
 
@@ -52,16 +53,14 @@ NetSignalkWS::NetSignalkWS(const char *host, int port, tState *state)
     this->port = port;
 }
 
-/*
-void ws_signalk_greet(WiFiClient& client) {
-  String dataFeed = client.readStringUntil('\n');
-  const char* data = "{\"context\": \"*\",\"subscribe\": [{\"path\": \"*\", \"policy\":\"instant\"}]}";
-  client.println(data);
-  client.flush();
 
-  Serial.println("Sent Subscribe all");
+void NetSignalkWS::greet() {
+
+  const char* data = "{\"context\": \"\",\"subscribe\": [{\"path\": \"environment.wind.angleApparent\", \"policy\":\"instant\"}, {\"path\": \"environment.wind.speedApparent\", \"policy\":\"instant\"}]}\n";
+  client->send(data);
+  Serial.println("Sent Subscribe");
 }
-*/
+
 
 bool NetSignalkWS::connect()
 {
@@ -74,15 +73,16 @@ bool NetSignalkWS::connect()
                               { this->onWsMessageCallback(message); });
             client->onEvent([this](WebsocketsEvent event, String data)
                             { this->onWsEventsCallback(event, data); });
-            sprintf(buff, "ws://%s:%d/signalk/v1/stream", host, port);
+            sprintf(buff, "ws://%s:%d/signalk/v1/stream?subscribe=none", host, port);
             Serial.print("Reconnecting to ");
             Serial.println(buff);
             if (client->connect(String(buff)))
             {
                 Serial.println("Ws conection opened");
                 lastMillis = millis();
+                greet();
                 return true;
-                // signalk_greet(client.c);
+                
             }
             else
             {
@@ -96,6 +96,7 @@ bool NetSignalkWS::connect()
             return true;
         }
     }
+    return false;
 };
 
 void NetSignalkWS::subscribe()

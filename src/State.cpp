@@ -731,6 +731,7 @@ bool tState::signalk_parse_ws(String msg)
   if (err)
   {
     Serial.println("Error decoding message");
+    Serial.println(msg);
     return false;
   }
 
