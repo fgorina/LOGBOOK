@@ -9,6 +9,7 @@
 #include <M5Tough.h>
 #include <CUF_24.h>
 #include <time.h>
+#include <Preferences.h>
 #include <NMEA2000_esp32.h>
 #include <NMEA2000_CAN.h>
 #include <N2kMessages.h>
@@ -55,12 +56,12 @@ const unsigned long ReceiveMessages[] PROGMEM = {
     130306L  // * Wind data
 };
 
-const tNMEA2000::tProductInformation AutopilotProductInformation PROGMEM = {
+const tNMEA2000::tProductInformation LogProductInformation PROGMEM = {
     1300,         // N2kVersion
-    200,          // Manufacturer's product code
-    "87180-2-EN", // Manufacturer's Model ID
-    "3.1.2",      // Manufacturer's Software version code
-    "LG-1",       // Manufacturer's Model version
+    201,          // Manufacturer's product code
+    "LOG-001", // Manufacturer's Model ID
+    "0.0.1",      // Manufacturer's Software version code
+    "LOG-001",       // Manufacturer's Model version
     "00000001",   // Manufacturer's Model serial code
     1,            // CertificationLevel
     4             // LoadEquivalency
@@ -68,15 +69,15 @@ const tNMEA2000::tProductInformation AutopilotProductInformation PROGMEM = {
 
 // ---  Example of using PROGMEM to hold Configuration information.  However, doing this will prevent any updating of
 //      these details outside of recompiling the program.
-const char AutopilotManufacturerInformation[] PROGMEM = "RAYMARINE, INC., fgorina@gmail.com";
-const char AutopilotInstallationDescription1[] PROGMEM = "https://www.azimutmarine.es/docs/manuales/Raymarine/RAY_Evolution%20EV100,%20ACUx_ESP.pdf";
-const char AutopilotInstallationDescription2[] PROGMEM = "Test";
+const char LogManufacturerInformation[] PROGMEM = "Paco Gorina, fgorina@gmail.com";
+const char LogInstallationDescription1[] PROGMEM = "Just connect and configure with a web browser";
+const char LogInstallationDescription2[] PROGMEM = "Select NMEA 2000, SignalK and WiFi and format settings";
 
-const unsigned long AutopilotSerialNumber PROGMEM = 1;
-const unsigned char AutopilotDeviceFunction = 150; // Autopilot
-const unsigned char AutopilotDeviceClass = 40;     // Steering and Control Surfaces
-const uint16_t AutopilotManufacturerCode = 1851;   // Raymarine
-const unsigned char AutopilotIndustryGroup = 4;    // Marine
+const unsigned long AutopilotSerialNumber PROGMEM = 13;
+const unsigned char LogDeviceFunction PROGMEM = 140; // Log Recorder
+const unsigned char LogtDeviceClass = 20;     // Safety Systems
+const uint16_t LogManufacturerCode = 2046;   // Free?
+const unsigned char LogIndustryGroup = 4;    // Marine
 
 // Global variables + State
 
@@ -85,8 +86,8 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 #ifdef DEV
 static String wifi_ssid = "elrond";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
-const char *skServer = "192.168.1.150";      //"192.168.1.54";
-const int skPort = 3000;
+static String skServer = "192.168.001.150";  //"192.168.1.54";
+int skPort = 3000;
 #else
 static String wifi_ssid = "Yamato";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
@@ -111,6 +112,13 @@ static int displaySaver = DISPLAY_ACTIVE;
 static char buffer[64];
 
 Screen *currentScreen = nullptr;
+
+// Preferences
+Preferences preferences;
+void writePreferences();
+void readPreferences();
+void lookupPypilot();
+
 // Test variables
 
 double speed = 5.0;   // 5 knots
@@ -124,7 +132,7 @@ String myIp = "Connecting...";
 
 // SignalK server
 
-NetSignalkWS *skWsServer = new NetSignalkWS(skServer, skPort, state);
+NetSignalkWS *skWsServer = new NetSignalkWS(skServer.c_str(), skPort, state);
 
 // Screens
 
@@ -137,6 +145,48 @@ Screen *screens[4] = {
 };
 
 boolean startWiFi();
+
+// Preferences
+
+void writePreferences()
+{
+  preferences.begin("Logbook", false);
+  preferences.remove("SSID");
+  preferences.remove("PASSWD");
+  preferences.remove("PPHOST");
+  preferences.remove("PPPORT");
+  preferences.remove("FILEFORMAT");
+
+  preferences.putString("SSID", wifi_ssid);
+  preferences.putString("PASSWD", wifi_password);
+  preferences.putString("PPHOST", skServer);
+  preferences.putInt("PPPORT", skPort);
+  preferences.putBool("FILEFORMAT", ((RecordScreen *)screens[1])->xmlFormat);
+  preferences.end();
+}
+
+void readPreferences()
+{
+  preferences.begin("Logbook", true);
+  wifi_ssid = preferences.getString("SSID", wifi_ssid);
+  wifi_password = preferences.getString("PASSWD", wifi_password);
+  skServer = preferences.getString("PPHOST", skServer);
+  skPort = preferences.getInt("PPPORT", skPort);
+  ((RecordScreen *)screens[1])->xmlFormat = preferences.getBool("FILEFORMAT", false);
+  preferences.end();
+  Serial.println("============== Preferences ================= ");
+  Serial.print("ssid : ");
+  Serial.println(wifi_ssid);
+  Serial.print("password : ");
+  Serial.println(wifi_password);
+  Serial.print("skServer : ");
+  Serial.println(skServer);
+  Serial.print("skPort : ");
+  Serial.println(skPort);
+  Serial.print("xmlFormat : ");
+  Serial.println(((RecordScreen *)screens[1])->xmlFormat);
+  Serial.println("============================================ ");
+}
 // Web server handlers
 
 String getContentType(String filename)
@@ -243,8 +293,8 @@ void handleFileList()
   File root = SD.open("/");
 
   String output = "<htlm><head><title>Logs</title></head><body>\n";
-  output += "<h1>Logs</h1>\n";
-  output += "<a href=/clear>Delete All Logs</a>\n"; 
+  output += "<h1><a href=\"/\">Logbook</a>/Logs</h1>\n";
+  output += "<a href=\"/ask\">Esborrar tots els Logs</a></br>";
   output += "<ul>\n";
   if (root.isDirectory())
   {
@@ -261,16 +311,45 @@ void handleFileList()
   }
 
   output += "</ul>\n";
+  unsigned long len = output.length();
+  server.sendHeader("Content-Length", String(len));
   server.send(200, "text/html", output);
 }
 
+void handleMenu()
+{
+
+  String output = "<html><head><title>Logbook by Paco Gorina</title></head><body>";
+  output += "<h1>Logbook by Paco Gorina</h1>";
+  output += "<ul>";
+  output += "<li><a href=\"/prefs\">Prefer&egrave;ncies</a></li>";
+  output += "<li><a href=\"/logs\">Logs</a></li>";
+
+  output += "</ul>";
+  output += "</body></html>";
+  unsigned long len = output.length();
+  server.sendHeader("Content-Length", String(len));
+  server.send(200, "text/html", output);
+
+}
+
+void handleAskForDelete()
+{
+  Serial.println("handleAskForDelete");
+  String output = "<html><head><title>Confirmeu, si us plau</title></head><body>";
+  output += "Segur que voleu esborrar tots els logs? <a href=/clear>Si</a> <a href=/>No</a>";
+  unsigned long len = output.length();
+  server.sendHeader("Content-Length", String(len));
+  server.send(200, "text/html", output);
+
+}
 void handleDeleteAll()
 {
   Serial.println("handleDeleteAll");
 
   File root = SD.open("/");
 
-  String output = "<htlm><head><title>Logs</title></head><body>\n";
+  String output = "<htlm><head><meta http-equiv=\"refresh\" content=\"0;url=/\"><title>Logs</title></head><body>\n";
   output += "<h1>Logs</h1>\n";
   output += "<ul>\n";
   if (root.isDirectory())
@@ -299,6 +378,61 @@ void deleteFile(String uri)
   SD.remove(path);
   handleFileList();
 }
+
+void handlePreferences()
+{
+  Serial.println("handlePreferences");
+  String output = "<html><head><title>Prefer&egrave;ncies</title></head><body>";
+  output += "<h1><a href=\"/\">Logbook</a>/Prefer&egrave;ncies</h1>";
+  output += "<form action=\"/updatePrefs\" method=\"post\">";
+  output += "<table border=0>";
+  output += "<tr><td><label for=\"ssid\">SSID:</label></td><td><input type=\"text\" id=\"ssid\" name=\"ssid\" value=\"" + wifi_ssid + "\"></td></tr>";
+  output += "<tr><td><label for=\"password\">Password:</label></td><td><input type=\"password\" id=\"password\" name=\"password\" value=\"" + wifi_password + "\"></td></tr>";
+  output += "<tr><td><label for=\"skserver\">SignalK Server:</label></td><td><input type=\"text\" id=\"skserver\" name=\"skserver\" value=\"" + skServer + "\"></td></tr>";
+  output += "<tr><td><label for=\"skport\">SignalK Port:</label></td><td><input type=\"number\" id=\"skport\" name=\"skport\" value=\"" + String(skPort) + "\"></td></tr>";
+  output += "<tr><td><label for=\"usexml\">Use GPX:</label></td><td><input type=\"checkbox\" id=\"usexml\" name=\"usexml\" value=\"on\" " + String(((RecordScreen *)screens[1])->xmlFormat ? "checked" : "") + "></td></tr>";
+  output += "<tr><td colspan=2 align=center><input type=\"submit\" value=\"Submit\"></td></tr>";
+  output += "</table>";
+  output += "</form>";
+  output += "</body></html>";
+  unsigned long len = output.length();
+  server.sendHeader("Content-Length", String(len));
+  server.send(200, "text/html", output);
+}
+
+void handleUpdatePreferences()
+{
+
+  Serial.println("handleUpdatePreferences");
+  if (server.hasArg("ssid"))
+  {
+    wifi_ssid = server.arg("ssid");
+  }
+  if (server.hasArg("password"))
+  {
+    wifi_password = server.arg("password");
+  }
+  if (server.hasArg("skserver"))
+  {
+    skServer = server.arg("skserver");
+  }
+  if (server.hasArg("skport"))
+  {
+    skPort = server.arg("skport").toInt();
+  }
+  if (server.hasArg("usexml"))
+  {
+    ((RecordScreen *)screens[1])->xmlFormat = server.arg("usexml") == "on";
+  }
+  else
+  {
+    ((RecordScreen *)screens[1])->xmlFormat = false;
+  }
+
+  writePreferences();
+  server.sendHeader("Location", "/", true);
+  server.send(302, "text/plain", "");
+}
 // WiFI
 boolean checkConnection()
 {                // Check wifi connection.
@@ -313,6 +447,30 @@ boolean checkConnection()
     count++;
   }
   return false;
+}
+
+void startWebServer()
+{
+  server.on("/", HTTP_GET, handleMenu);
+  server.on("/ask", HTTP_GET, handleAskForDelete);
+  server.on("/clear", HTTP_GET, handleDeleteAll);
+  server.on("/prefs", HTTP_GET, handlePreferences);
+  server.on("/logs", HTTP_GET, handleFileList);
+  server.on("/updatePrefs", HTTP_POST, handleUpdatePreferences);
+
+  server.onNotFound([]()
+                    {
+                      if (server.uri().startsWith("/del"))
+                      {
+                        deleteFile(server.uri());
+                      }
+                     
+    else if (!handleFileRead(server.uri())) {
+      server.send(404, "text/plain", "FileNotFound");
+    } });
+
+  server.begin();
+  Serial.println("HTTP server started");
 }
 
 boolean startWiFi()
@@ -346,29 +504,13 @@ boolean startWiFi()
 
     // Try to connect to signalk
 
-    if (strlen(skServer) > 0 && skPort > 0)
+    if (skServer.length() > 0 && skPort > 0)
     {
       skWsServer->begin(); // Connect to the SignalK TCP server
     }
 
     // Now start Web Server
-    server.on("/", HTTP_GET, handleFileList);
-    server.on("/clear", HTTP_GET, handleDeleteAll);
-
-
-    server.onNotFound([]()
-                      {
-                        if (server.uri().startsWith("/del"))
-                        {
-                          deleteFile(server.uri());
-                        }
-                       
-      else if (!handleFileRead(server.uri())) {
-        server.send(404, "text/plain", "FileNotFound");
-      } });
-
-    server.begin();
-    Serial.println("HTTP server started");
+    startWebServer();
 
     currentScreen->draw();
     return true;
@@ -384,15 +526,15 @@ void HandleNMEA2000Msg(const tN2kMsg &N2kMsg)
 void setup_NMEA2000()
 {
 
-  NMEA2000.SetProductInformation(&AutopilotProductInformation);
+  NMEA2000.SetProductInformation(&LogProductInformation);
   // Set Configuration information
-  NMEA2000.SetProgmemConfigurationInformation(AutopilotManufacturerInformation, AutopilotInstallationDescription1, AutopilotInstallationDescription2);
+  NMEA2000.SetProgmemConfigurationInformation(LogManufacturerInformation, LogInstallationDescription1, LogInstallationDescription2);
   // Set device information
   NMEA2000.SetDeviceInformation(AutopilotSerialNumber,     // Unique number. Use e.g. Serial number.
-                                AutopilotDeviceFunction,   // Device function=Autopìlot. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                AutopilotDeviceClass,      // Device class=Steering and Control Surfaces. See codes on  https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                AutopilotManufacturerCode, // Just choosen free from code list on https://web.archive.org/web/20190529161431/http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
-                                AutopilotIndustryGroup     // Industry Group
+                                LogDeviceFunction,   // Device function=Autopìlot. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                LogtDeviceClass,      // Device class=Steering and Control Surfaces. See codes on  https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                LogManufacturerCode, // Just choosen free from code list on https://web.archive.org/web/20190529161431/http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
+                                LogIndustryGroup     // Industry Group
   );
 
   Serial.begin(115200);
@@ -461,6 +603,7 @@ void setup()
   Serial.begin(115200);
   SD.begin();
   M5.Lcd.setFreeFont(&unicode_24px);
+  readPreferences();
   setup_NMEA2000();
 
   last_touched = millis();
@@ -503,5 +646,5 @@ void loop()
   // test_step();
 
   loopTask();
-  delay(5);
+  delay(1);
 }

@@ -9,6 +9,7 @@
 class RecordScreen : public Screen
 {   
     public:
+    bool xmlFormat = false;
     RecordScreen(int width, int height, const char* title, tState* state, time_t period); // period of writing in millis
     void enter();
     void exit();
@@ -19,7 +20,7 @@ class RecordScreen : public Screen
     
     static const int LENNAME = 31;
     static const int MAXBUFFER = 64;
-    bool xmlFormat = false;
+    
     Button *brecord = nullptr;
     tState* state;
     char buffer[64];

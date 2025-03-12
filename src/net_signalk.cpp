@@ -34,7 +34,8 @@ void NetSignalkWS::onWsEventsCallback(WebsocketsEvent event, String data)
 
 void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
 {
-    if(!started){
+    if (!started)
+    {
         subscribe();
         started = true;
     }
@@ -42,7 +43,7 @@ void NetSignalkWS::onWsMessageCallback(WebsocketsMessage message)
     // Serial.println(message.data());
     // wsskClient.lastActivity = millis();
     lastMillis = millis();
-    //Serial.println(message.data());
+    // Serial.println(message.data());
     bool found = state->signalk_parse_ws(message.data());
     if (!found)
     {
@@ -58,13 +59,9 @@ NetSignalkWS::NetSignalkWS(const char *host, int port, tState *state)
     this->port = port;
 }
 
-
-void NetSignalkWS::greet() {
- 
-
-  
+void NetSignalkWS::greet()
+{
 }
-
 
 bool NetSignalkWS::connect()
 {
@@ -86,7 +83,6 @@ bool NetSignalkWS::connect()
                 lastMillis = millis();
                 greet();
                 return true;
-                
             }
             else
             {
@@ -105,15 +101,21 @@ bool NetSignalkWS::connect()
 
 void NetSignalkWS::subscribe()
 {
-  const char* data = "{\"context\": \"\",\"subscribe\": [{\"path\": \"environment.wind.angleApparent\", \"policy\":\"instant\"},"
-  "{\"path\": \"environment.wind.speedApparent\", \"policy\":\"instant\"},"
-   "{\"path\": \"navigation.headingMagnetic\", \"policy\":\"instant\"},"
-    "{\"path\": \"navigation.position\", \"policy\":\"instant\"},"
-    "{\"path\": \"navigation.speedOverGround\", \"policy\":\"instant\"},"
-    "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"}"
-  "]}\n";
-  client->send(data);
-  Serial.println("Sent Subscribe");
+    const char *data = "{\"context\": \"\",\"subscribe\": [{\"path\": \"environment.wind.angleApparent\", \"policy\":\"instant\"},"
+                       "{\"path\": \"environment.wind.speedApparent\", \"policy\":\"instant\"},"
+                       "{\"path\": \"environment.wind.speedTrue\", \"policy\":\"instant\"},"
+                       "{\"path\": \"environment.wind.directionTrue\", \"policy\":\"instant\"},"
+                       "{\"path\": \"environment.depth.belowTransducer\", \"policy\":\"instant\"},"
+                       "{\"path\": \"propulsion.p0.revolutions\", \"policy\":\"instant\"},"
+                       "{\"path\": \"propulsion.p0.temperature\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.headingMagnetic\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.headingTrue\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.position\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.speedOverGround\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"}"
+                       "]}\n";
+    client->send(data);
+    Serial.println("Sent Subscribe");
 }
 
 void NetSignalkWS::begin()

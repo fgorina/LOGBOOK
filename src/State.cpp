@@ -149,18 +149,15 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
       magneticHeading.when = time(nullptr);
       magneticHeading.origin = N2kMsg.Source;
       magneticHeading.reference = HeadingReference;
-
     }
-    else  if (HeadingReference == tN2kHeadingReference::N2khr_true)
+    else if (HeadingReference == tN2kHeadingReference::N2khr_true)
     {
       trueHeading.heading = VesselHeading;
       trueHeading.when = time(nullptr);
       trueHeading.origin = N2kMsg.Source;
       trueHeading.reference = HeadingReference;
-
     }
-   
-   
+
     if (!verbose)
     {
       return;
@@ -368,13 +365,16 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
 
   ParseN2kPGN130306(N2kMsg, SID, windSpeed, windAngle, windReference);
 
-  if(windReference == tN2kWindReference::N2kWind_Apparent){
+  if (windReference == tN2kWindReference::N2kWind_Apparent)
+  {
     apparentWind.when = time(nullptr);
     apparentWind.origin = N2kMsg.Source;
     apparentWind.reference = windReference;
     apparentWind.angle = windAngle;
     apparentWind.speed = windSpeed;
-  }else if (windReference == tN2kWindReference::N2kWind_True_North){
+  }
+  else if (windReference == tN2kWindReference::N2kWind_True_North)
+  {
     trueWind.when = time(nullptr);
     trueWind.origin = N2kMsg.Source;
     trueWind.reference = windReference;
@@ -423,18 +423,20 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
 
   time_t now = time(nullptr);
 
-  if(ref == tN2kHeadingReference::N2khr_magnetic){
+  if (ref == tN2kHeadingReference::N2khr_magnetic)
+  {
     magneticHeading.when = now;
     magneticHeading.origin = N2kMsg.Source;
     magneticHeading.reference = ref;
     magneticHeading.heading = Heading;
-  }else if(ref == tN2kHeadingReference::N2khr_true){
+  }
+  else if (ref == tN2kHeadingReference::N2khr_true)
+  {
     trueHeading.when = now;
     trueHeading.origin = N2kMsg.Source;
     trueHeading.reference = ref;
     trueHeading.heading = Heading;
   }
-
 
   variation.when = now;
   variation.origin = N2kMsg.Source;
@@ -652,7 +654,7 @@ void tState::tState::printInfo()
   Serial.print("Heading Command Magnetic: ");
   Serial.println(headingCommandMagnetic.value);
   Serial.print("Heading: Magnetic : ");
-  Serial.print(magneticHeading.heading); 
+  Serial.print(magneticHeading.heading);
   Serial.print(" True : ");
   Serial.println(trueHeading.heading);
   Serial.print("Rudder Command: ");
@@ -680,20 +682,24 @@ void tState::saveCsv(File f)
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", cog.heading / PI * 180.0, sog.value * 3600.0 / 1852.0);
   f.print(buffer);
-  sprintf(buffer, "%f\t%f\t%f\t%f\t%f\t", magneticHeading.heading / PI * 180.0, trueHeading.heading / PI * 180.0, attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
+  sprintf(buffer, "%f\t%f\t%f\t", magneticHeading.heading / PI * 180.0, trueHeading.heading / PI * 180.0, rudderAngle.value);
+  f.print(buffer);
+  sprintf(buffer, "%f\t%f\t%f\t",  attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", apparentWind.angle / PI * 180.0, apparentWind.speed * 3600.0 / 1852.0);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", trueWind.angle / PI * 180.0, trueWind.speed * 3600.0 / 1852.0);
-  f.print
-  (buffer);
-  sprintf(buffer, "%f", depth.value);
-  f.println(buffer);
+  f.print(buffer);
+  sprintf(buffer, "%f\t", depth.value);
+  f.print(buffer);
+  sprintf(buffer, "%f\t%f", rpm.value * 60, engineTemperature.value - 273.15);
+  f.print(buffer);
+  f.println();
 }
 
 void tState::saveCsvHeader(File f)
 {
-  f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth");
+  f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
 }
 void tState::saveGPXTrackpoint(File f)
 {
@@ -712,39 +718,46 @@ void tState::saveGPXTrackpoint(File f)
   f.println("<extensions>");
 
   f.println("<pvt:ext>");
-  sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading);
+  sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading / PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<pvt:sog>%f</pvt:sog>", sog.value);
   f.println(buffer);
   f.println("</pvt:ext>");
 
   f.println("<imu:ext>");
-  sprintf(buffer, "<imu:hdg>%f</imu:hdg>", trueHeading.heading);
+  sprintf(buffer, "<imu:hdg>%f</imu:hdg>", trueHeading.heading / PI * 180.0);
   f.println(buffer);
-  sprintf(buffer, "<imu:pitch>%f</imu:pitch>", attitude.pitch);
+  sprintf(buffer, "<imu:pitch>%f</imu:pitch>", attitude.pitch / PI * 180.0);
   f.println(buffer);
-  sprintf(buffer, "<imu:roll>%f</imu:roll>", attitude.roll);
+  sprintf(buffer, "<imu:roll>%f</imu:roll>", attitude.roll / PI * 180.0);
   f.println(buffer);
-  sprintf(buffer, "<imu:rot>%f</imu:rot>", rateOfTurn.value);
+  sprintf(buffer, "<imu:rot>%f</imu:rot>", rateOfTurn.value / PI * 180.0 * 60.0);
   f.println(buffer);
   f.println("</imu:ext>");
   f.println("<sea:ext>");
-  sprintf(buffer, "<sea:awa>%f</sea:awa>", apparentWind.angle);
+  sprintf(buffer, "<sea:awa>%f</sea:awa>", apparentWind.angle / PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<sea:aws>%f</sea:aws>", apparentWind.speed);
   f.println(buffer);
-  
+  sprintf(buffer, "<sea:rudder>%f</sea:rudder>", rudderAngle.value / PI * 180.0);
+  f.println(buffer);
   sprintf(buffer, "<sea:depth>%f</sea:depth>", depth.value);
   f.println(buffer);
 
   f.println("</sea:ext>");
   f.println("<met:ext>");
-  sprintf(buffer, "<met:gwd>%f</met:gwd>", trueWind.angle);
+  sprintf(buffer, "<met:gwd>%f</met:gwd>", trueWind.angle/  PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<met:gws>%f</met:gws>", trueWind.speed);
   f.println(buffer);
   f.println("</met:ext>");
 
+  f.println("<eng:ext>");
+  sprintf(buffer, "<eng:tach>%f</eng:tach>", rpm.value * 60);
+  f.println(buffer);
+  sprintf(buffer, "<eng:temp>%f</eng:temp>", engineTemperature.value - 273.15);
+  f.println(buffer);
+  f.println("</eng:ext>");
 
   f.println("</extensions>");
   f.println("</trkpt>");
@@ -761,6 +774,7 @@ void tState::saveGPXHeader(File f, char *name)
   f.println("xmlns:imu=\"file:///Users/fgorina/Documents/Varis/imu.xsd\"");
   f.println("xmlns:sea=\"file:///Users/fgorina/Documents/Varis/sea.xsd\"");
   f.println("xmlns:met=\"file:///Users/fgorina/Documents/Varis/met.xsd\"");
+  f.println("xmlns:eng=\"file:///Users/fgorina/Documents/Varis/eng.xsd\"");
   f.println("xmlns=\"http://www.topografix.com/GPX/1/1\">");
 
   f.println("<trk>");
@@ -774,7 +788,6 @@ void tState::saveGPXFooter(File f)
 {
   f.println("</trkseg>\n</trk>\n</gpx>");
 }
-
 
 // SignalK Support
 
@@ -866,6 +879,7 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
     {
       if (value.is<float>())
       {
+
         magneticHeading.origin = -1;
         magneticHeading.when = now;
         magneticHeading.reference = tN2kHeadingReference::N2khr_magnetic;
@@ -980,8 +994,10 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
         attitude.roll = value["roll"].as<float>();
       }
     }
+
     // Change so rtc time is initialized to UTC from GPS. Should be quite exact
     else if (strcmp(t, "datetime") == 0)
+
     {
       if (value.is<String>())
       {
@@ -989,7 +1005,6 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
         if (val != NULL && !timeSet)
         {
           setupTimeSK(val);
-         
         }
       }
     }
@@ -1010,10 +1025,19 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
           apparentWind.origin = -1;
           apparentWind.angle = value.as<float>();
           apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
-          
         }
       }
       else if (strcmp(w, "angleTrueGround") == 0)
+      {
+        if (value.is<float>())
+        {
+          trueWind.when = now;
+          trueWind.origin = -1;
+          trueWind.angle = value.as<float>();
+          trueWind.reference = tN2kWindReference::N2kWind_True_North;
+        }
+      }
+      else if (strcmp(w, "directionTrue") == 0)
       {
         if (value.is<float>())
         {
@@ -1039,7 +1063,6 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
           apparentWind.origin = -1;
           apparentWind.speed = value.as<float>();
           apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
-          
         }
       }
       else if (strcmp(w, "speedOverGround") == 0)
@@ -1094,267 +1117,268 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
         }
       }
     }
+  }
 
-    else if (starts_with(p, "steering."))
+  else if (starts_with(p, "steering."))
+  {
+    const char *t = step_into_token(p);
+    if (strcmp(t, "rudderAngle") == 0)
     {
-      const char *t = step_into_token(p);
-      if (strcmp(t, "rudderAngle") == 0)
+      if (value.is<float>())
       {
-        if (value.is<float>())
-        {
-          rudderAngle.when = now;
-          rudderAngle.origin = -1;
-          rudderAngle.value = value.as<float>();
-        }
-      }
-    }
-    else if (starts_with(p, "propulsion."))
-    {
-      String engineID = path.substring(11);
-      int idx = engineID.indexOf('.');
-      if (idx > 0)
-      {
-        engineID = engineID.substring(0, idx);
-        if (engineID != NULL)
-        {
-          // engine_t *eng = lookup_engine(engineID.c_str());
-          // if (eng != NULL)
-          //{
-          String prefix = String("propulsion.") + engineID;
-          if (path == (prefix + ".revolutions"))
-          {
-            if (value.is<float>())
-            {
-              rpm.when = now;
-              rpm.origin = -1;
-              rpm.value = value.as<float>();
-            }
-          }
-          else if (path == (prefix + ".temperature"))
-          {
-            if (value.is<float>())
-            {
-              engineTemperature.when = now;
-              engineTemperature.origin = -1;
-              engineTemperature.value = value.as<float>();
-            }
-          }
-          else if (path == (prefix + ".oilPressure"))
-          {
-            if (value.is<float>())
-            {
-              oilPressure.when = now;
-              oilPressure.origin = -1;
-              oilPressure.value = value.as<float>();
-            }
-          }
-        }
+        rudderAngle.when = now;
+        rudderAngle.origin = -1;
+        rudderAngle.value = value.as<float>();
       }
     }
   }
-  };
-
-  /*
-      else if (strcmp(t, "lights.navigation.state") == 0)
-      {
-
-        if (value.as<int>() == 0)
-        {
-          shipDataModel.navigation.lights.bow_red_green.state.st = on_off_e::OFF;
-        }
-        else
-        {
-          shipDataModel.navigation.lights.bow_red_green.state.st = ON;
-        }
-        shipDataModel.navigation.lights.bow_red_green.state.age = millis();
-      }
-      else if (strcmp(t, "lights.anchor.state") == 0)
-      {
-        if (value.as<int>() == 0)
-        {
-          shipDataModel.navigation.lights.anchor.state.st = on_off_e::OFF;
-        }
-        else
-        {
-          shipDataModel.navigation.lights.anchor.state.st = ON;
-        }
-        shipDataModel.navigation.lights.anchor.state.age = millis();
-      }
-      else if (strcmp(t, "lights.motoring.state") == 0)
-      {
-        if (value.as<int>() == 0)
-        {
-          shipDataModel.navigation.lights.motoring.state.st = on_off_e::OFF;
-        }
-        else
-        {
-          shipDataModel.navigation.lights.motoring.state.st = ON;
-        }
-        shipDataModel.navigation.lights.motoring.state.age = millis();
-      }
-      else if (strcmp(t, "lights.deck.state") == 0)
-      {
-        if (value.as<int>() == 0)
-        {
-          shipDataModel.navigation.lights.deck.state.st = on_off_e::OFF;
-        }
-        else
-        {
-          shipDataModel.navigation.lights.deck.state.st = ON;
-        }
-        shipDataModel.navigation.lights.deck.state.age = millis();
-      }
-      else if (strcmp(t, "lights.instruments.state") == 0)
-      {
-        if (value.as<int>() == 0)
-        {
-          shipDataModel.navigation.lights.instruments.state.st = on_off_e::OFF;
-        }
-        else
-        {
-          shipDataModel.navigation.lights.instruments.state.st = ON;
-        }
-        shipDataModel.navigation.lights.instruments.state.age = millis();
-      }
-        }
-        */
-
-  /*
-else if (starts_with(p, "tanks."))
-{
-  String tankType;
-  int idTankType;
-  int idx;
-  String attr;
-
-  char *pch;
-  pch = strtok((char *)p, ".");
-  if (pch != NULL)
+  else if (starts_with(p, "propulsion."))
   {
-    pch = strtok(NULL, ".");
-    if (pch != NULL)
+    String engineID = path.substring(11);
+    int idx = engineID.indexOf('.');
+    if (idx > 0)
     {
-      tankType = String(pch);
-      pch = strtok(NULL, ".");
-      if (pch != NULL)
+      engineID = engineID.substring(0, idx);
+      if (engineID != NULL)
       {
-        idx = atoi(pch) - 1;
-        pch = strtok(NULL, ".");
-        if (pch != NULL)
-        {
-          attr = String(pch);
-        }
-      }
-    }
-  }
+        // engine_t *eng = lookup_engine(engineID.c_str());
+        // if (eng != NULL)
+        //{
+        String prefix = String("propulsion.") + engineID;
 
-  if (tankType == "freshWater")
-  {
-    idTankType = FRESH_WATER;
-  }
-  else if (tankType == "fuel")
-  {
-    idTankType = FUEL;
-  }
-  else if (tankType == "wasteWater")
-  {
-    idTankType = WASTE_WATER;
-  }
-  else if (tankType == "blackWater")
-  {
-    idTankType = BLACK_WATER;
-  }
-  else
-  {
-    idTankType = FLUID_TYPE_NA;
-  }
-
-  if (idx < MAX_TANKS && idx >= 0)
-  {
-    if (attr == "currentLevel")
-    {
-      shipDataModel.tanks.tank[idx].percent_of_full.pct = value.as<float>() * 100.0;
-      shipDataModel.tanks.tank[idx].percent_of_full.age = millis();
-      shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
-    }
-    else if (attr == "capacity")
-    {
-      shipDataModel.tanks.tank[idx].volume.L = value.as<float>() * 1000.0;
-      shipDataModel.tanks.tank[idx].volume.age = millis();
-      shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
-    }
-  }
-  Serial.print("Tank ");
-  Serial.print(tankType);
-  Serial.print(" Index ");
-  Serial.print(idx);
-  Serial.print(" Attr ");
-  Serial.print(attr);
-  Serial.print(" Value ");
-  Serial.println(value.as<String>());
-  }
-  /*else if (starts_with(p, "electrical.lights."))
-{
-
-  if (strcmp(p, "electrical.lights.1.compass.state") == 0)
-  {
-    float f = value.as<float>();
-    shipDataModel.navigation.lights.compass.intensity = f;
-    shipDataModel.navigation.lights.compass.age = millis();
-    Serial.print("Receiving compass light data ");
-    Serial.println(f);
-  }
-}
-
-  /*
-        else if (path == (prefix + ".alternatorVoltage"))
+        if (path == (prefix + ".revolutions"))
         {
           if (value.is<float>())
           {
-            eng->alternator_voltage.volt = value.as<float>();
-            eng->alternator_voltage.age = millis();
+            rpm.when = now;
+            rpm.origin = -1;
+            rpm.value = value.as<float>();
           }
         }
+        else if (path == (prefix + ".temperature"))
+        {
+          if (value.is<float>())
+          {
+            engineTemperature.when = now;
+            engineTemperature.origin = -1;
+            engineTemperature.value = value.as<float>();
+          }
+        }
+        else if (path == (prefix + ".oilPressure"))
+        {
+          if (value.is<float>())
+          {
+            oilPressure.when = now;
+            oilPressure.origin = -1;
+            oilPressure.value = value.as<float>();
+          }
+        }
+      }
+    }
+  }
+};
 
-         /*
-  else if (starts_with(t, "outside."))
+/*
+    else if (strcmp(t, "lights.navigation.state") == 0)
+    {
+
+      if (value.as<int>() == 0)
+      {
+        shipDataModel.navigation.lights.bow_red_green.state.st = on_off_e::OFF;
+      }
+      else
+      {
+        shipDataModel.navigation.lights.bow_red_green.state.st = ON;
+      }
+      shipDataModel.navigation.lights.bow_red_green.state.age = millis();
+    }
+    else if (strcmp(t, "lights.anchor.state") == 0)
+    {
+      if (value.as<int>() == 0)
+      {
+        shipDataModel.navigation.lights.anchor.state.st = on_off_e::OFF;
+      }
+      else
+      {
+        shipDataModel.navigation.lights.anchor.state.st = ON;
+      }
+      shipDataModel.navigation.lights.anchor.state.age = millis();
+    }
+    else if (strcmp(t, "lights.motoring.state") == 0)
+    {
+      if (value.as<int>() == 0)
+      {
+        shipDataModel.navigation.lights.motoring.state.st = on_off_e::OFF;
+      }
+      else
+      {
+        shipDataModel.navigation.lights.motoring.state.st = ON;
+      }
+      shipDataModel.navigation.lights.motoring.state.age = millis();
+    }
+    else if (strcmp(t, "lights.deck.state") == 0)
+    {
+      if (value.as<int>() == 0)
+      {
+        shipDataModel.navigation.lights.deck.state.st = on_off_e::OFF;
+      }
+      else
+      {
+        shipDataModel.navigation.lights.deck.state.st = ON;
+      }
+      shipDataModel.navigation.lights.deck.state.age = millis();
+    }
+    else if (strcmp(t, "lights.instruments.state") == 0)
+    {
+      if (value.as<int>() == 0)
+      {
+        shipDataModel.navigation.lights.instruments.state.st = on_off_e::OFF;
+      }
+      else
+      {
+        shipDataModel.navigation.lights.instruments.state.st = ON;
+      }
+      shipDataModel.navigation.lights.instruments.state.age = millis();
+    }
+      }
+      */
+
+/*
+else if (starts_with(p, "tanks."))
+{
+String tankType;
+int idTankType;
+int idx;
+String attr;
+
+char *pch;
+pch = strtok((char *)p, ".");
+if (pch != NULL)
+{
+  pch = strtok(NULL, ".");
+  if (pch != NULL)
   {
-    const char *o = step_into_token(t);
-    if (strcmp(o, "pressure") == 0)
+    tankType = String(pch);
+    pch = strtok(NULL, ".");
+    if (pch != NULL)
     {
-      if (value.is<float>())
+      idx = atoi(pch) - 1;
+      pch = strtok(NULL, ".");
+      if (pch != NULL)
       {
-        shipDataModel.environment.air_outside.pressure.hPa = value.as<float>() / 100.0;
-        shipDataModel.environment.air_outside.pressure.age = millis();
-      }
-    }
-    else if (strcmp(o, "humidity") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.environment.air_outside.humidity_pct.pct = value.as<float>() * 100.0;
-        shipDataModel.environment.air_outside.humidity_pct.age = millis();
-      }
-    }
-    else if (strcmp(o, "temperature") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.environment.air_outside.temp_deg_C.deg_C = value.as<float>() - 273.15;
-        shipDataModel.environment.air_outside.temp_deg_C.age = millis();
-      }
-    }
-    else if (strcmp(o, "illuminance") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.environment.air_outside.illuminance.lux = value.as<float>();
-        shipDataModel.environment.air_outside.illuminance.age = millis();
+        attr = String(pch);
       }
     }
   }
 }
 
-  */
+if (tankType == "freshWater")
+{
+  idTankType = FRESH_WATER;
+}
+else if (tankType == "fuel")
+{
+  idTankType = FUEL;
+}
+else if (tankType == "wasteWater")
+{
+  idTankType = WASTE_WATER;
+}
+else if (tankType == "blackWater")
+{
+  idTankType = BLACK_WATER;
+}
+else
+{
+  idTankType = FLUID_TYPE_NA;
+}
 
-  /* Signal K Parsing */
+if (idx < MAX_TANKS && idx >= 0)
+{
+  if (attr == "currentLevel")
+  {
+    shipDataModel.tanks.tank[idx].percent_of_full.pct = value.as<float>() * 100.0;
+    shipDataModel.tanks.tank[idx].percent_of_full.age = millis();
+    shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
+  }
+  else if (attr == "capacity")
+  {
+    shipDataModel.tanks.tank[idx].volume.L = value.as<float>() * 1000.0;
+    shipDataModel.tanks.tank[idx].volume.age = millis();
+    shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
+  }
+}
+Serial.print("Tank ");
+Serial.print(tankType);
+Serial.print(" Index ");
+Serial.print(idx);
+Serial.print(" Attr ");
+Serial.print(attr);
+Serial.print(" Value ");
+Serial.println(value.as<String>());
+}
+/*else if (starts_with(p, "electrical.lights."))
+{
+
+if (strcmp(p, "electrical.lights.1.compass.state") == 0)
+{
+  float f = value.as<float>();
+  shipDataModel.navigation.lights.compass.intensity = f;
+  shipDataModel.navigation.lights.compass.age = millis();
+  Serial.print("Receiving compass light data ");
+  Serial.println(f);
+}
+}
+
+/*
+      else if (path == (prefix + ".alternatorVoltage"))
+      {
+        if (value.is<float>())
+        {
+          eng->alternator_voltage.volt = value.as<float>();
+          eng->alternator_voltage.age = millis();
+        }
+      }
+
+       /*
+else if (starts_with(t, "outside."))
+{
+  const char *o = step_into_token(t);
+  if (strcmp(o, "pressure") == 0)
+  {
+    if (value.is<float>())
+    {
+      shipDataModel.environment.air_outside.pressure.hPa = value.as<float>() / 100.0;
+      shipDataModel.environment.air_outside.pressure.age = millis();
+    }
+  }
+  else if (strcmp(o, "humidity") == 0)
+  {
+    if (value.is<float>())
+    {
+      shipDataModel.environment.air_outside.humidity_pct.pct = value.as<float>() * 100.0;
+      shipDataModel.environment.air_outside.humidity_pct.age = millis();
+    }
+  }
+  else if (strcmp(o, "temperature") == 0)
+  {
+    if (value.is<float>())
+    {
+      shipDataModel.environment.air_outside.temp_deg_C.deg_C = value.as<float>() - 273.15;
+      shipDataModel.environment.air_outside.temp_deg_C.age = millis();
+    }
+  }
+  else if (strcmp(o, "illuminance") == 0)
+  {
+    if (value.is<float>())
+    {
+      shipDataModel.environment.air_outside.illuminance.lux = value.as<float>();
+      shipDataModel.environment.air_outside.illuminance.age = millis();
+    }
+  }
+}
+}
+
+*/
+
+/* Signal K Parsing */

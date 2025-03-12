@@ -304,7 +304,7 @@ void  RecordScreen::saveHeader(File f, char* name){
     if(xmlFormat){
         state->saveGPXHeader(f, name);
     }else{
-        file.println("Time\tLongitut\tLatitut\tCog\tSog\tHeading\tPitch\tRoll\tRot\tAwa\tAws");
+        state->saveCsvHeader(f);
     }
 }
 
