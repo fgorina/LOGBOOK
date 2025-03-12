@@ -13,7 +13,7 @@ void SDScreen::enter()
   ButtonColors off_clrs = {BLACK, CYAN, WHITE};
   ButtonColors selected_clrs = {RED, WHITE, WHITE};
 
-  brecord = new Button(width / 2 + width / 6, height / 2 - 30, width / 4, 60, false, "Exit", off_clrs, on_clrs, MC_DATUM);
+  bexit = new Button(width / 2 + width / 6, height / 2 - 30, width / 4, 60, false, "Exit", off_clrs, on_clrs, MC_DATUM);
   bup = new Button(width / 2 + width / 6, 10, width / 4, 60, false, "^", off_clrs, on_clrs, MC_DATUM);
   bdown = new Button(width / 2 + width / 6, height - 70, width / 4, 60, false, "v", off_clrs, on_clrs, MC_DATUM);
 
@@ -23,13 +23,13 @@ void SDScreen::exit()
 {
   Serial.println("SDScreen::exit");
 
-  if (brecord != nullptr)
+  if (bexit != nullptr)
   {
-    brecord->delHandlers();
-    brecord->hide(BLACK);
-    delete (brecord);
-    brecord = nullptr;
-    Serial.println("Deleted brecord");
+    bexit->delHandlers();
+    bexit->hide(BLACK);
+    delete (bexit);
+    bexit = nullptr;
+    Serial.println("Deleted bexit");
   }
 
   if (bup != nullptr)
@@ -56,7 +56,7 @@ void SDScreen::draw()
   Serial.println("SDScreen::draw");
   M5.Lcd.clear();
   drawSD();
-  brecord->draw();
+  bexit->draw();
   bup->draw();
   bdown->draw();
 }
@@ -67,7 +67,7 @@ int SDScreen::run()
   {
     do_select_file();
   }
-  if (brecord != nullptr && brecord->wasReleased())
+  if (bexit != nullptr && bexit->wasReleased())
   {
     return (0);
   }
@@ -122,13 +122,13 @@ void SDScreen::drawFile(int file, bool selected)
     if (selected)
     {
       M5.Lcd.setTextColor(BLACK);
-      M5.Lcd.fillRect(0, (file - first_file) * 30 + HEADER_SIZE, width / 2, 30, WHITE);
+      M5.Lcd.fillRect(0, (file - first_file) * 30 + HEADER_SIZE, width / 2 + width / 6, 30, WHITE);
       M5.Lcd.drawString(sd_files[file], 10, HEADER_SIZE + 15 + (file - first_file) * 30);
     }
     else
     {
       M5.Lcd.setTextColor(WHITE);
-      M5.Lcd.fillRect(0, (file - first_file) * 30 + HEADER_SIZE, width / 2, 30, BLACK);
+      M5.Lcd.fillRect(0, (file - first_file) * 30 + HEADER_SIZE, width / 2 + width / 6, 30, BLACK);
       M5.Lcd.drawString(sd_files[file], 10, HEADER_SIZE + 15 + (file - first_file) * 30);
     }
   }
@@ -136,7 +136,7 @@ void SDScreen::drawFile(int file, bool selected)
 void SDScreen::drawSD()
 {
 
-  M5.Lcd.fillRect(0, 0, width / 2, height, BLACK);
+  M5.Lcd.fillRect(0, 0, width / 2 + width / 6, height, BLACK);
   M5.Lcd.setTextDatum(CC_DATUM);
 
   M5.Lcd.setTextColor(CYAN);

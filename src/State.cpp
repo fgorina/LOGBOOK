@@ -143,11 +143,24 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
 
     // Will set Heading
 
-    heading.when = time(nullptr);
-    heading.origin = N2kMsg.Source;
-    heading.heading = VesselHeading;
-    heading.reference = HeadingReference;
+    if (HeadingReference == tN2kHeadingReference::N2khr_magnetic)
+    {
+      magneticHeading.heading = VesselHeading;
+      magneticHeading.when = time(nullptr);
+      magneticHeading.origin = N2kMsg.Source;
+      magneticHeading.reference = HeadingReference;
 
+    }
+    else  if (HeadingReference == tN2kHeadingReference::N2khr_true)
+    {
+      trueHeading.heading = VesselHeading;
+      trueHeading.when = time(nullptr);
+      trueHeading.origin = N2kMsg.Source;
+      trueHeading.reference = HeadingReference;
+
+    }
+   
+   
     if (!verbose)
     {
       return;
@@ -355,11 +368,19 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
 
   ParseN2kPGN130306(N2kMsg, SID, windSpeed, windAngle, windReference);
 
-  wind.when = time(nullptr);
-  wind.origin = N2kMsg.Source;
-  wind.reference = windReference;
-  wind.angle = windAngle;
-  wind.speed = windSpeed;
+  if(windReference == tN2kWindReference::N2kWind_Apparent){
+    apparentWind.when = time(nullptr);
+    apparentWind.origin = N2kMsg.Source;
+    apparentWind.reference = windReference;
+    apparentWind.angle = windAngle;
+    apparentWind.speed = windSpeed;
+  }else if (windReference == tN2kWindReference::N2kWind_True_North){
+    trueWind.when = time(nullptr);
+    trueWind.origin = N2kMsg.Source;
+    trueWind.reference = windReference;
+    trueWind.angle = windAngle;
+    trueWind.speed = windSpeed;
+  }
 
   if (!verbose)
   {
@@ -402,10 +423,18 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
 
   time_t now = time(nullptr);
 
-  heading.when = now;
-  heading.origin = N2kMsg.Source;
-  heading.reference = ref;
-  heading.heading = Heading;
+  if(ref == tN2kHeadingReference::N2khr_magnetic){
+    magneticHeading.when = now;
+    magneticHeading.origin = N2kMsg.Source;
+    magneticHeading.reference = ref;
+    magneticHeading.heading = Heading;
+  }else if(ref == tN2kHeadingReference::N2khr_true){
+    trueHeading.when = now;
+    trueHeading.origin = N2kMsg.Source;
+    trueHeading.reference = ref;
+    trueHeading.heading = Heading;
+  }
+
 
   variation.when = now;
   variation.origin = N2kMsg.Source;
@@ -622,8 +651,10 @@ void tState::tState::printInfo()
   Serial.println(headingCommandTrue.value);
   Serial.print("Heading Command Magnetic: ");
   Serial.println(headingCommandMagnetic.value);
-  Serial.print("Heading: ");
-  Serial.println(heading.heading);
+  Serial.print("Heading: Magnetic : ");
+  Serial.print(magneticHeading.heading); 
+  Serial.print(" True : ");
+  Serial.println(trueHeading.heading);
   Serial.print("Rudder Command: ");
   Serial.println(rudderCommand.command);
   Serial.print("Rudder Angle: ");
@@ -649,10 +680,20 @@ void tState::saveCsv(File f)
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", cog.heading / PI * 180.0, sog.value * 3600.0 / 1852.0);
   f.print(buffer);
-  sprintf(buffer, "%f\t%f\t%f\t%f\t", heading.heading / PI * 180.0, attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
+  sprintf(buffer, "%f\t%f\t%f\t%f\t%f\t", magneticHeading.heading / PI * 180.0, trueHeading.heading / PI * 180.0, attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
   f.print(buffer);
-  sprintf(buffer, "%f\t%f", wind.angle / PI * 180.0, wind.speed * 3600.0 / 1852.0);
+  sprintf(buffer, "%f\t%f\t", apparentWind.angle / PI * 180.0, apparentWind.speed * 3600.0 / 1852.0);
+  f.print(buffer);
+  sprintf(buffer, "%f\t%f\t", trueWind.angle / PI * 180.0, trueWind.speed * 3600.0 / 1852.0);
+  f.print
+  (buffer);
+  sprintf(buffer, "%f", depth.value);
   f.println(buffer);
+}
+
+void tState::saveCsvHeader(File f)
+{
+  f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth");
 }
 void tState::saveGPXTrackpoint(File f)
 {
@@ -678,7 +719,7 @@ void tState::saveGPXTrackpoint(File f)
   f.println("</pvt:ext>");
 
   f.println("<imu:ext>");
-  sprintf(buffer, "<imu:hdg>%f</imu:hdg>", heading.heading);
+  sprintf(buffer, "<imu:hdg>%f</imu:hdg>", trueHeading.heading);
   f.println(buffer);
   sprintf(buffer, "<imu:pitch>%f</imu:pitch>", attitude.pitch);
   f.println(buffer);
@@ -688,11 +729,23 @@ void tState::saveGPXTrackpoint(File f)
   f.println(buffer);
   f.println("</imu:ext>");
   f.println("<sea:ext>");
-  sprintf(buffer, "<sea:awa>%f</sea:awa>", wind.angle);
+  sprintf(buffer, "<sea:awa>%f</sea:awa>", apparentWind.angle);
   f.println(buffer);
-  sprintf(buffer, "<sea:aws>%f</sea:aws>", wind.speed);
+  sprintf(buffer, "<sea:aws>%f</sea:aws>", apparentWind.speed);
   f.println(buffer);
+  
+  sprintf(buffer, "<sea:depth>%f</sea:depth>", depth.value);
+  f.println(buffer);
+
   f.println("</sea:ext>");
+  f.println("<met:ext>");
+  sprintf(buffer, "<met:gwd>%f</met:gwd>", trueWind.angle);
+  f.println(buffer);
+  sprintf(buffer, "<met:gws>%f</met:gws>", trueWind.speed);
+  f.println(buffer);
+  f.println("</met:ext>");
+
+
   f.println("</extensions>");
   f.println("</trkpt>");
 }
@@ -707,6 +760,7 @@ void tState::saveGPXHeader(File f, char *name)
   f.println("xmlns:pvt=\"file:///Users/fgorina/Documents/Varis/pvt.xsd\"");
   f.println("xmlns:imu=\"file:///Users/fgorina/Documents/Varis/imu.xsd\"");
   f.println("xmlns:sea=\"file:///Users/fgorina/Documents/Varis/sea.xsd\"");
+  f.println("xmlns:met=\"file:///Users/fgorina/Documents/Varis/met.xsd\"");
   f.println("xmlns=\"http://www.topografix.com/GPX/1/1\">");
 
   f.println("<trk>");
@@ -720,6 +774,9 @@ void tState::saveGPXFooter(File f)
 {
   f.println("</trkseg>\n</trk>\n</gpx>");
 }
+
+
+// SignalK Support
 
 bool tState::signalk_parse_ws(String msg)
 {
@@ -809,10 +866,20 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
     {
       if (value.is<float>())
       {
-        heading.origin = -1;
-        heading.when = now;
-        heading.reference = tN2kHeadingReference::N2khr_magnetic;
-        heading.heading = value.as<float>();
+        magneticHeading.origin = -1;
+        magneticHeading.when = now;
+        magneticHeading.reference = tN2kHeadingReference::N2khr_magnetic;
+        magneticHeading.heading = value.as<float>();
+      }
+    }
+    else if (strcmp(t, "headingTrue") == 0)
+    {
+      if (value.is<float>())
+      {
+        trueHeading.origin = -1;
+        trueHeading.when = now;
+        trueHeading.reference = tN2kHeadingReference::N2khr_true;
+        trueHeading.heading = value.as<float>();
       }
     }
     else if (strcmp(t, "position") == 0)
@@ -939,10 +1006,10 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
 
         if (value.is<float>())
         {
-          wind.when = now;
-          wind.origin = -1;
-          wind.angle = value.as<float>();
-          wind.reference = tN2kWindReference::N2kWind_Apparent;
+          apparentWind.when = now;
+          apparentWind.origin = -1;
+          apparentWind.angle = value.as<float>();
+          apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
           
         }
       }
@@ -950,10 +1017,10 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
       {
         if (value.is<float>())
         {
-          wind.when = now;
-          wind.origin = -1;
-          wind.angle = value.as<float>();
-          wind.reference = tN2kWindReference::N2kWind_True_North;
+          trueWind.when = now;
+          trueWind.origin = -1;
+          trueWind.angle = value.as<float>();
+          trueWind.reference = tN2kWindReference::N2kWind_True_North;
         }
       }
       /* else if (strcmp(w, "angleTrueWater") == 0)
@@ -968,10 +1035,10 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
       {
         if (value.is<float>())
         {
-          wind.when = now;
-          wind.origin = -1;
-          wind.speed = value.as<float>();
-          wind.reference = tN2kWindReference::N2kWind_Apparent;
+          apparentWind.when = now;
+          apparentWind.origin = -1;
+          apparentWind.speed = value.as<float>();
+          apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
           
         }
       }
@@ -979,20 +1046,20 @@ void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVarian
       {
         if (value.is<float>())
         {
-          wind.when = now;
-          wind.origin = -1;
-          wind.speed = value.as<float>();
-          wind.reference = tN2kWindReference::N2kWind_True_North;
+          trueWind.when = now;
+          trueWind.origin = -1;
+          trueWind.speed = value.as<float>();
+          trueWind.reference = tN2kWindReference::N2kWind_True_North;
         }
       }
       else if (strcmp(w, "speedTrue") == 0)
       {
         if (value.is<float>())
         {
-          wind.when = now;
-          wind.origin = -1;
-          wind.speed = value.as<float>();
-          wind.reference = tN2kWindReference::N2kWind_True_North;
+          trueWind.when = now;
+          trueWind.origin = -1;
+          trueWind.speed = value.as<float>();
+          trueWind.reference = tN2kWindReference::N2kWind_True_North;
         }
       }
     }

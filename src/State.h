@@ -48,14 +48,20 @@ public:
     tDoubleData sog{when : 0, origin : 0, value : 0.0}; // Speed in m/s
     tDoubleData stw{when : 0, origin : 0, value : 0.0}; // Speed through water in m/s
     tDoubleData depth{when : 0, origin : 0, value : 0.0}; // Depth in m
-    tPositionData position{when : 0, origin : 0, latitude : 42.428205, longitude : 3.165478};
-    tHeadingData heading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
-    tAttitudeData attitude{when : 0, origin : 0, yaw : 0.0, pitch : 0.0, roll : 0.0};
-    tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // degrees/s
+    tPositionData position{when : 0, origin : 0, latitude : 42.428205, longitude : 3.165478};  // Position in degrees
+
+    tHeadingData magneticHeading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
+    tHeadingData trueHeading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
     tDoubleData deviation{when : 0, origin : 0, value : 0.0};
     tDoubleData variation{when : 0, origin : 0, value : 0.0};
+
+    tAttitudeData attitude{when : 0, origin : 0, yaw : 0.0, pitch : 0.0, roll : 0.0};
+    tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // degrees/s
+   
     tDoubleData rudderAngle{when : 0, origin : 0, value : 0.0};     // rudder.angle
-    tWindData wind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
+    tWindData trueWind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
+    tWindData apparentWind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
+    
     tDoubleData rpm{when : 0, origin : 0, value : 0.0}; // RPM
     tDoubleData engineTemperature{when : 0, origin : 0, value : 0.0}; // Engine Temperature
     tDoubleData oilPressure{when : 0, origin : 0, value : 0.0}; // Engine Temperature
@@ -82,6 +88,7 @@ public:
 
     void printInfo();
     void saveCsv(File f);
+    void saveCsvHeader(File f);
     void saveGPXTrackpoint(File f);
     void saveGPXHeader(File f, char* name);
     void saveGPXFooter(File f);

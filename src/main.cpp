@@ -25,7 +25,6 @@
 
 #include "State.h"
 
-
 #include <SD.h>
 
 // Screens
@@ -81,9 +80,21 @@ const unsigned char AutopilotIndustryGroup = 4;    // Marine
 
 // Global variables + State
 
-static String wifi_ssid = " Yamato"; //"TP-LINK_2695";//Yamato"; //"starlink_mini";   // Store the name of the wireless network.
+#define DEV
+
+#ifdef DEV
+static String wifi_ssid = "elrond";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
-//static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
+const char *skServer = "192.168.1.150";      //"192.168.1.54";
+const int skPort = 3000;
+#else
+static String wifi_ssid = "Yamato";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
+static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
+const char *skServer = "192.168.1.2";        //"192.168.1.54";
+const int skPort = 3000;
+#endif
+
+// static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
 
 // Http Server
 WebServer server(80);
@@ -113,10 +124,7 @@ String myIp = "Connecting...";
 
 // SignalK server
 
-const char* skServer =  "192.168.1.2";//"192.168.1.54"; 
-const int skPort = 3000;
-
-NetSignalkWS *skWsServer = new NetSignalkWS(  skServer, skPort, state);
+NetSignalkWS *skWsServer = new NetSignalkWS(skServer, skPort, state);
 
 // Screens
 
@@ -236,7 +244,8 @@ void handleFileList()
 
   String output = "<htlm><head><title>Logs</title></head><body>\n";
   output += "<h1>Logs</h1>\n";
-  output += "<ul>\n"; 
+  output += "<a href=/clear>Delete All Logs</a>\n"; 
+  output += "<ul>\n";
   if (root.isDirectory())
   {
     File file = root.openNextFile();
@@ -244,17 +253,52 @@ void handleFileList()
     {
       if (file.name()[0] != '.')
       {
-        output += String("<li><a href=\"") + file.path() + String("\">") + file.name() + "</a></li>\n";
+        output += String("<li><a href=\"") + file.path() + String("\">") + file.name() + "</a>    <a href=del/" + file.name() + ">Delete</a></li>\n";
       }
 
       file = root.openNextFile();
     }
   }
-  
+
   output += "</ul>\n";
   server.send(200, "text/html", output);
 }
 
+void handleDeleteAll()
+{
+  Serial.println("handleDeleteAll");
+
+  File root = SD.open("/");
+
+  String output = "<htlm><head><title>Logs</title></head><body>\n";
+  output += "<h1>Logs</h1>\n";
+  output += "<ul>\n";
+  if (root.isDirectory())
+  {
+    File file = root.openNextFile();
+    while (file)
+    {
+      if (file.name()[0] != '.')
+      {
+        SD.remove(file.path());
+      }
+
+      file = root.openNextFile();
+    }
+  }
+
+  output += "</ul>\n";
+  server.send(200, "text/html", output);
+}
+
+void deleteFile(String uri)
+{
+  Serial.println("deleteFile uri " + uri);
+  String path = uri.substring(4, uri.length());
+  Serial.println("deleteFile " + path);
+  SD.remove(path);
+  handleFileList();
+}
 // WiFI
 boolean checkConnection()
 {                // Check wifi connection.
@@ -302,16 +346,24 @@ boolean startWiFi()
 
     // Try to connect to signalk
 
-    if (strlen(skServer) > 0 && skPort > 0) {
-      skWsServer->begin();  // Connect to the SignalK TCP server
+    if (strlen(skServer) > 0 && skPort > 0)
+    {
+      skWsServer->begin(); // Connect to the SignalK TCP server
     }
 
-
     // Now start Web Server
-    server.on("/list", HTTP_GET, handleFileList);
+    server.on("/", HTTP_GET, handleFileList);
+    server.on("/clear", HTTP_GET, handleDeleteAll);
+
+
     server.onNotFound([]()
                       {
-      if (!handleFileRead(server.uri())) {
+                        if (server.uri().startsWith("/del"))
+                        {
+                          deleteFile(server.uri());
+                        }
+                       
+      else if (!handleFileRead(server.uri())) {
         server.send(404, "text/plain", "FileNotFound");
       } });
 
@@ -402,57 +454,6 @@ void switchTo(int i)
   }
 }
 
-void test_step()
-{
-  unsigned long m = millis();
-  time_t t = time(nullptr);
-  if (M5.Touch.changed)
-  {
-    heading = heading + 10.0 / 180.0 * PI;
-  }
-  if (m - last_message > 500)
-  {
-
-    // Compute a distance. Speed = 5kt
-
-    double distance = 5.0 * 1852.0 * ((m - last_message) / 3600000.0); // distance in meters
-    // Compute a direction
-    double dlat = distance * cos(heading);
-    double dlon = distance * sin(heading);
-
-    // Compute a new position
-    double lat = state->position.latitude + (dlat / 1852.0 / 60.0);
-    double lon = state->position.longitude + (dlon / (1852.0 * cos(state->position.latitude / 180.0 * PI)) / 60.0);
-
-    // Set neew position
-    state->position.latitude = lat;
-    state->position.longitude = lon;
-    state->position.when = t;
-    state->position.origin = 99;
-
-    // Set the cog and sog
-
-    state->cog.heading = heading;
-    state->cog.when = time(nullptr);
-    state->cog.origin = 99;
-
-    state->heading.heading = heading;
-    state->heading.when = t;
-    state->heading.origin = 99;
-
-    state->sog.value = speed / 3600 * 1852.0;
-    state->sog.when = t;
-    state->sog.origin = 99;
-
-    state->wind.angle = (60.0 + random(-5, 5)) / 180.0 * PI;
-    state->wind.speed = 15.0 + random(-5, 5) * 1852.0 / 3600.0;
-    state->wind.when = t;
-    state->wind.origin = 99;
-    state->wind.reference = tN2kWindReference::N2kWind_Apparent;
-
-    last_message = m;
-  }
-}
 void setup()
 {
 
@@ -461,7 +462,7 @@ void setup()
   SD.begin();
   M5.Lcd.setFreeFont(&unicode_24px);
   setup_NMEA2000();
-  
+
   last_touched = millis();
 
   // M5.Lcd.wakeup();
@@ -499,7 +500,7 @@ void loop()
   M5.update();
   server.handleClient();
   skWsServer->run();
-  //test_step();
+  // test_step();
 
   loopTask();
   delay(5);

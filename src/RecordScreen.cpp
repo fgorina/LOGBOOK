@@ -1,3 +1,6 @@
+#define DEST_FS_USES_SD
+#include <ESP32-targz.h>
+
 #include "RecordScreen.h"
 #include <Arduino.h>
 #include <M5Tough.h>
@@ -14,8 +17,10 @@ void RecordScreen::enter()
     const ButtonColors off_clrs = {BLACK, CYAN, WHITE};
     const ButtonColors on_clrs = {BLUE, CYAN, WHITE};
     brecord = new Button(width / 2 + width / 8, height / 2 - 30, width / 4, 60, false, "Start", off_clrs, on_clrs, MC_DATUM);
+    recording = true;
     old_second_millis = millis();
-    draw();
+    startRecord();
+   // draw(); esta dintre de StartRecord
 }
 
 void RecordScreen::exit()
@@ -63,10 +68,10 @@ void RecordScreen::draw_distance()
     snprintf(buffer, MAXBUFFER, "SOG %03.1f kt", state->sog.value * 3600.0 / 1852.0);
     M5.Lcd.drawString(buffer, 19, 100);
 
-    snprintf(buffer, MAXBUFFER, u8"AWA %03.0f º", state->wind.angle / PI * 180.0);
+    snprintf(buffer, MAXBUFFER, u8"AWA %03.0f º", state->apparentWind.angle / PI * 180.0);
     M5.Lcd.drawString(buffer, 19, 130);
 
-    snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->wind.speed * 3600.0 / 1852.0);
+    snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->apparentWind.speed * 3600.0 / 1852.0);
     M5.Lcd.drawString(buffer, 19, 155);
 }
 
@@ -168,9 +173,68 @@ void RecordScreen::stopRecord()
     saveData(file);
     saveFooter(file);
     file.close();
+    if( compressFile(filename) > 0){
+        SD.remove(filename);
+    }
     file = File();
     recording = false;
 }
+
+size_t RecordScreen::compressFile( const String &inputFilename)
+{
+  if(!SD.exists(inputFilename)) {
+    Serial.printf("Filesystem is missing '%s' file, halting\n", inputFilename.c_str());
+    while(1) yield();
+  }
+
+  String gzFilename = inputFilename+".gz";
+  size_t ret = 0;
+  size_t gzFileSize = 0;
+
+  File gzFile;
+
+  File inputFile = SD.open(inputFilename, "r");
+  size_t uncompressedSize = inputFile.size();
+
+  if( !inputFile || uncompressedSize==0 ) {
+    Serial.printf("Unable to open '%s' file or file empty\n", inputFilename.c_str());
+    inputFile.close();
+    return 0;
+  }
+
+  if(  uncompressedSize < 512 ) { // compressed size will be higher than uncompressed size
+    Serial.printf("File '%s' is not worth compressing (%d bytes only).\n", inputFilename.c_str(), uncompressedSize);
+    inputFile.close();
+    return 0;
+  }
+
+  if(!SD.exists(gzFilename)) { // the gz file does not exits, compress!
+
+    gzFile = SD.open(gzFilename, "w");
+    if( !gzFile ) {
+      Serial.printf("Unable to open '%s' file for writing\n", gzFilename.c_str());
+      inputFile.close();
+    return 0;
+    }
+
+    gzFileSize = LZPacker::compress( &inputFile, inputFile.size(), &gzFile );
+    gzFile.close();
+
+    if( gzFileSize == 0 || gzFileSize > uncompressedSize ) { // uh-oh
+      SD.remove(gzFilename);
+      ret = 0;
+      
+    }else{
+        Serial.printf("Compressed %s (%d bytes) to %s (%d bytes)\n", inputFilename.c_str(), inputFile.size(), gzFilename.c_str(), gzFileSize );
+        ret = gzFileSize;
+    }
+
+  } 
+
+  inputFile.close();
+  return ret;
+}
+
 
 void RecordScreen::updatedDateTime()
 {

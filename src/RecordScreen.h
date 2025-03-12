@@ -19,7 +19,7 @@ class RecordScreen : public Screen
     
     static const int LENNAME = 31;
     static const int MAXBUFFER = 64;
-    bool xmlFormat = true;
+    bool xmlFormat = false;
     Button *brecord = nullptr;
     tState* state;
     char buffer[64];
@@ -41,6 +41,7 @@ class RecordScreen : public Screen
     char filename[LENNAME-1] = "";
 
 
+
     void startRecord();
     void stopRecord();
     void updatedDateTime();
@@ -53,7 +54,7 @@ class RecordScreen : public Screen
     void  saveHeader(File f, char* name);
     void  saveFooter(File f);
     double haversine(double lat1, double lon1, double lat2, double lon2);   // Distances lox in Nm
-
+    size_t compressFile( const String &inputFilename);
 };
 
 #endif

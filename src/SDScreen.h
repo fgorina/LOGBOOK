@@ -27,7 +27,7 @@ class SDScreen : public Screen
     int first_file = 0;
     int selected_file = -1; 
 
-    Button *brecord = nullptr;
+    Button *bexit = nullptr;
     Button *bup = nullptr;
     Button *bdown = nullptr; 
 
