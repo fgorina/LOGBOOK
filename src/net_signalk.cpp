@@ -129,25 +129,28 @@ void NetSignalkWS::begin()
 
 void NetSignalkWS::run()
 {
-
-    if (client != nullptr)
+    if (WiFi.status() == WL_CONNECTED)
     {
-        if (millis() - lastMillis > timeout && false)
+        if (client != nullptr)
         {
-            Serial.println("Timeout");
-            client->close();
-            delete client;
-            client = nullptr;
-            lastMillis = millis();
-            connect();
+            if (millis() - lastMillis > timeout && false)
+            {
+                Serial.println("Timeout");
+                client->close();
+                delete client;
+                client = nullptr;
+                lastMillis = millis();
+                connect();
+            }
+            else
+            {
+                client->poll();
+            }
         }
         else
         {
-            client->poll();
+            Serial.println("Connecting to SignalK");
+            connect();
         }
-    }
-    else
-    {
-        connect();
     }
 }

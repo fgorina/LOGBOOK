@@ -28,6 +28,13 @@
 
 #include <SD.h>
 
+#include <FS.h>
+#include <SPIFFS.h>
+
+#ifndef FORMAT_SPIFFS_IF_FAILED
+#define FORMAT_SPIFFS_IF_FAILED true
+#endif
+
 // Screens
 
 #include "MenuScreen.h"
@@ -57,14 +64,14 @@ const unsigned long ReceiveMessages[] PROGMEM = {
 };
 
 const tNMEA2000::tProductInformation LogProductInformation PROGMEM = {
-    1300,         // N2kVersion
-    201,          // Manufacturer's product code
-    "LOG-001", // Manufacturer's Model ID
-    "0.0.1",      // Manufacturer's Software version code
-    "LOG-001",       // Manufacturer's Model version
-    "00000001",   // Manufacturer's Model serial code
-    1,            // CertificationLevel
-    4             // LoadEquivalency
+    1300,       // N2kVersion
+    201,        // Manufacturer's product code
+    "LOG-001",  // Manufacturer's Model ID
+    "0.0.1",    // Manufacturer's Software version code
+    "LOG-001",  // Manufacturer's Model version
+    "00000001", // Manufacturer's Model serial code
+    1,          // CertificationLevel
+    4           // LoadEquivalency
 };
 
 // ---  Example of using PROGMEM to hold Configuration information.  However, doing this will prevent any updating of
@@ -75,9 +82,9 @@ const char LogInstallationDescription2[] PROGMEM = "Select NMEA 2000, SignalK an
 
 const unsigned long AutopilotSerialNumber PROGMEM = 13;
 const unsigned char LogDeviceFunction PROGMEM = 140; // Log Recorder
-const unsigned char LogtDeviceClass = 20;     // Safety Systems
-const uint16_t LogManufacturerCode = 2046;   // Free?
-const unsigned char LogIndustryGroup = 4;    // Marine
+const unsigned char LogtDeviceClass = 20;            // Safety Systems
+const uint16_t LogManufacturerCode = 2046;           // Free?
+const unsigned char LogIndustryGroup = 4;            // Marine
 
 // Global variables + State
 
@@ -254,6 +261,25 @@ String getContentType(String filename)
   return "text/plain";
 }
 
+String getFullUri(String last){
+  return "http://logbook.local/" + last;
+}
+
+void handleHelp()
+{
+  Serial.println("handleHelp");
+  File file = SPIFFS.open("/help.html", "r");
+  if (!file)
+  {
+    Serial.println("File not found");
+  }
+  else
+  {
+    server.streamFile(file, "text/html");
+    file.close();
+  }
+  SPIFFS.end();
+}
 bool handleFileRead(String path)
 {
 
@@ -293,8 +319,8 @@ void handleFileList()
   File root = SD.open("/");
 
   String output = "<htlm><head><title>Logs</title></head><body>\n";
-  output += "<h1><a href=\"/\">Logbook</a>/Logs</h1>\n";
-  output += "<a href=\"/ask\">Esborrar tots els Logs</a></br>";
+  output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Logs</h1>\n";
+  output += "<a href=\"" + getFullUri("ask") + "\">Esborrar tots els Logs</a></br>";
   output += "<ul>\n";
   if (root.isDirectory())
   {
@@ -303,7 +329,8 @@ void handleFileList()
     {
       if (file.name()[0] != '.')
       {
-        output += String("<li><a href=\"") + file.path() + String("\">") + file.name() + "</a>    <a href=del/" + file.name() + ">Delete</a></li>\n";
+        String path= file.path();
+        output += String("<li><a href=\"" + getFullUri(file.path()) + "\">") + file.name() + "</a>    <a href=\"" +  getFullUri(String("del/" + path)) +  "\">Delete</a></li>\n";
       }
 
       file = root.openNextFile();
@@ -318,30 +345,28 @@ void handleFileList()
 
 void handleMenu()
 {
-
+  Serial.println("handleMenu");
   String output = "<html><head><title>Logbook by Paco Gorina</title></head><body>";
   output += "<h1>Logbook by Paco Gorina</h1>";
   output += "<ul>";
-  output += "<li><a href=\"/prefs\">Prefer&egrave;ncies</a></li>";
-  output += "<li><a href=\"/logs\">Logs</a></li>";
+  output += "<li><a href=\"" + getFullUri("prefs") + "\">Prefer&egrave;ncies</a></li>";
+  output += "<li><a href=\"" + getFullUri("logs") + "\">Logs</a></li>";
 
   output += "</ul>";
   output += "</body></html>";
   unsigned long len = output.length();
   server.sendHeader("Content-Length", String(len));
   server.send(200, "text/html", output);
-
 }
 
 void handleAskForDelete()
 {
   Serial.println("handleAskForDelete");
   String output = "<html><head><title>Confirmeu, si us plau</title></head><body>";
-  output += "Segur que voleu esborrar tots els logs? <a href=/clear>Si</a> <a href=/>No</a>";
+  output += "Segur que voleu esborrar tots els logs? <a href=" + getFullUri("clear") + ">Si</a> <a href=" + getFullUri("logs") + ">No</a>";
   unsigned long len = output.length();
   server.sendHeader("Content-Length", String(len));
   server.send(200, "text/html", output);
-
 }
 void handleDeleteAll()
 {
@@ -383,8 +408,8 @@ void handlePreferences()
 {
   Serial.println("handlePreferences");
   String output = "<html><head><title>Prefer&egrave;ncies</title></head><body>";
-  output += "<h1><a href=\"/\">Logbook</a>/Prefer&egrave;ncies</h1>";
-  output += "<form action=\"/updatePrefs\" method=\"post\">";
+  output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Prefer&egrave;ncies</h1>";
+  output += "<form action=\"" + getFullUri("updatePrefs") + "\" method=\"post\">";
   output += "<table border=0>";
   output += "<tr><td><label for=\"ssid\">SSID:</label></td><td><input type=\"text\" id=\"ssid\" name=\"ssid\" value=\"" + wifi_ssid + "\"></td></tr>";
   output += "<tr><td><label for=\"password\">Password:</label></td><td><input type=\"password\" id=\"password\" name=\"password\" value=\"" + wifi_password + "\"></td></tr>";
@@ -430,20 +455,20 @@ void handleUpdatePreferences()
   }
 
   writePreferences();
-  server.sendHeader("Location", "/", true);
+  server.sendHeader("Location",  getFullUri("index.html") , true);
   server.send(302, "text/plain", "");
 }
 // WiFI
 boolean checkConnection()
 {                // Check wifi connection.
   int count = 0; // count.
-  while (count < 30)
+  while (count < 1000)
   { // If you fail to connect to wifi within 30*350ms (10.5s), return false; otherwise return true.
     if (WiFi.status() == WL_CONNECTED)
     {
       return true;
     }
-    delay(350);
+    delay(10);
     count++;
   }
   return false;
@@ -452,11 +477,14 @@ boolean checkConnection()
 void startWebServer()
 {
   server.on("/", HTTP_GET, handleMenu);
+  server.on("/index.html", HTTP_GET, handleMenu);
   server.on("/ask", HTTP_GET, handleAskForDelete);
-  server.on("/clear", HTTP_GET, handleDeleteAll);
-  server.on("/prefs", HTTP_GET, handlePreferences);
   server.on("/logs", HTTP_GET, handleFileList);
+  server.on("/prefs", HTTP_GET, handlePreferences);
   server.on("/updatePrefs", HTTP_POST, handleUpdatePreferences);
+  server.on("/clear", HTTP_GET, handleDeleteAll);
+  server.on("/help", HTTP_GET, handleHelp);
+
 
   server.onNotFound([]()
                     {
@@ -502,6 +530,16 @@ boolean startWiFi()
       Serial.println("RTC already synced");
     }
 
+    // Start mdns so we have a name
+
+    if (!MDNS.begin("logbook"))
+    {
+      Serial.println("Error setting up MDNS responder!");
+    }
+    else
+    {
+      Serial.println("mDNS responder started");
+    }
     // Try to connect to signalk
 
     if (skServer.length() > 0 && skPort > 0)
@@ -530,11 +568,11 @@ void setup_NMEA2000()
   // Set Configuration information
   NMEA2000.SetProgmemConfigurationInformation(LogManufacturerInformation, LogInstallationDescription1, LogInstallationDescription2);
   // Set device information
-  NMEA2000.SetDeviceInformation(AutopilotSerialNumber,     // Unique number. Use e.g. Serial number.
-                                LogDeviceFunction,   // Device function=Autopìlot. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                LogtDeviceClass,      // Device class=Steering and Control Surfaces. See codes on  https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                LogManufacturerCode, // Just choosen free from code list on https://web.archive.org/web/20190529161431/http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
-                                LogIndustryGroup     // Industry Group
+  NMEA2000.SetDeviceInformation(AutopilotSerialNumber, // Unique number. Use e.g. Serial number.
+                                LogDeviceFunction,     // Device function=Autopìlot. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                LogtDeviceClass,       // Device class=Steering and Control Surfaces. See codes on  https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                LogManufacturerCode,   // Just choosen free from code list on https://web.archive.org/web/20190529161431/http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
+                                LogIndustryGroup       // Industry Group
   );
 
   Serial.begin(115200);
@@ -595,13 +633,36 @@ void switchTo(int i)
     }
   }
 }
+///Tasks
 
+TaskHandle_t taskNetwork;
+
+
+void networkTask(void *parameter)
+{
+  while(true){
+    if (!checkConnection())
+    {
+      startWiFi();
+    }
+    server.handleClient();  
+    vTaskDelay(1);
+  }
+
+}
+
+  
 void setup()
 {
 
   M5.begin();
   Serial.begin(115200);
   SD.begin();
+  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED))
+  {
+    Serial.println("SPIFFS Mount Failed");
+    return;
+  }
   M5.Lcd.setFreeFont(&unicode_24px);
   readPreferences();
   setup_NMEA2000();
@@ -610,6 +671,7 @@ void setup()
 
   // M5.Lcd.wakeup();
   Serial.println("Entering Menu Screen");
+  xTaskCreatePinnedToCore(networkTask, "TaskNetwork", 4000, NULL, 1, &taskNetwork, 0);
 
   // currentScreen = new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs");
   currentScreen = screens[0];
@@ -636,15 +698,11 @@ void loop()
 {
   // NMEA2000.ParseMessages();
 
-  if (!checkConnection())
-  {
-    startWiFi();
-  }
+ 
   M5.update();
-  server.handleClient();
+  
   skWsServer->run();
-  // test_step();
 
   loopTask();
-  delay(1);
+  vTaskDelay(1);
 }
