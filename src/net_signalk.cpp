@@ -133,7 +133,7 @@ void NetSignalkWS::run()
     {
         if (client != nullptr)
         {
-            if (millis() - lastMillis > timeout && false)
+            if (millis() - lastMillis > timeout)
             {
                 Serial.println("Timeout");
                 client->close();

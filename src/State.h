@@ -34,6 +34,7 @@ protected:
     void handlePositionRapidUpdate(const tN2kMsg &N2kMsg);
     void handleCOGSOGRapidUpdate(const tN2kMsg &N2kMsg);
     void handleGNSS(const tN2kMsg &N2kMsg);
+    void handleEngineParamRapid(const tN2kMsg &N2kMsg);
 
     bool ParseN2kPGN129285(const tN2kMsg &N2kMsg, uint16_t &Start, uint16_t &nItems, uint16_t &Database, uint16_t &Route,
                                    tN2kNavigationDirection &NavDirection, char *RouteName, size_t RouteNameBufSize, tN2kGenericStatusPair &SupplementaryData,

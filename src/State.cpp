@@ -50,6 +50,8 @@ void tState::setupTimeSK(String datetime)
 }
 /* NMEA 2000 support */
 
+/* Route WP Information. Not used for log */
+
 bool tState::ParseN2kPGN129285(const tN2kMsg &N2kMsg, uint16_t &Start, uint16_t &nItems, uint16_t &Database, uint16_t &Route,
                                tN2kNavigationDirection &NavDirection, char *RouteName, size_t RouteNameBufSize, tN2kGenericStatusPair &SupplementaryData,
                                uint16_t wptArraySize, t_waypoint *waypoints)
@@ -97,6 +99,8 @@ Will use to set the RTC
 SystemDate is Days since 1 January 1970.
 SystemsTime is seconds since midnight.
 
+// Probably would be better do it once for session
+
 */
 
 void tState::handleSystemDateTime(const tN2kMsg &N2kMsg)
@@ -115,6 +119,7 @@ void tState::handleSystemDateTime(const tN2kMsg &N2kMsg)
   setupTime(now);
 }
 
+// Heading and Track Control.  We only use VesselHeading
 void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
 {
   tN2kOnOff RudderLimitExceeded;
@@ -212,6 +217,8 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
   }
 }
 
+// Navigation Info. Not used in Logbook for the moment
+
 void tState::handleNavigationInfo(const tN2kMsg &N2kMsg)
 {
   unsigned char SID;
@@ -275,6 +282,8 @@ void tState::handleNavigationInfo(const tN2kMsg &N2kMsg)
     Serial.println("------------------------------------------------------------------------------");
   }
 }
+
+// Cross Track Error. Not used in log for the moment
 void tState::handleXTE(const tN2kMsg &N2kMsg)
 {
 
@@ -304,6 +313,9 @@ void tState::handleXTE(const tN2kMsg &N2kMsg)
     Serial.println("------------------------------------------------------------------------------");
   }
 }
+
+// Route Info. See parrseN2kPGN!29285. Not used for the moment
+
 void tState::handleRouteInfo(const tN2kMsg &N2kMsg)
 {
 
@@ -356,6 +368,8 @@ void tState::handleRouteInfo(const tN2kMsg &N2kMsg)
   }
 }
 
+// Wind
+
 void tState::handleWind(const tN2kMsg &N2kMsg)
 {
   double windSpeed;
@@ -395,6 +409,8 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
   Serial.print(" reference ");
   Serial.println(windReference);
 }
+
+// Rudder command is not used for the moment
 void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
 {
 
@@ -410,6 +426,8 @@ void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
 
   // Disregard order!!!
 }
+
+// Heading. Also updates deviation and variation
 
 void tState::handleHeading(const tN2kMsg &N2kMsg)
 {
@@ -447,6 +465,8 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
   deviation.value = Deviation;
 }
 
+// Rate Of Turn
+
 void tState::handleRateOfTurn(const tN2kMsg &N2kMsg)
 {
 
@@ -461,6 +481,9 @@ void tState::handleRateOfTurn(const tN2kMsg &N2kMsg)
   rateOfTurn.origin = N2kMsg.Source;
   rateOfTurn.value = RateOfTurn;
 }
+
+// Attitude. Usually Yaw is the same as Heading (for a constant)
+
 void tState::handleAttitude(const tN2kMsg &N2kMsg)
 {
   unsigned char SID;
@@ -475,7 +498,24 @@ void tState::handleAttitude(const tN2kMsg &N2kMsg)
   attitude.yaw = Yaw;
   attitude.pitch = Pitch;
   attitude.roll = Roll;
+
+  if (!verbose)
+  {
+    return;
+  }
+  Serial.println("Attitude");
+  Serial.print("Source ");
+  Serial.print(N2kMsg.Source);
+  Serial.print(" Yaw ");
+  Serial.print(attitude.yaw / 3.141592 * 180.0);
+  Serial.print(" Pitch ");
+  Serial.print(attitude.pitch / 3.141592 * 180.0);
+  Serial.print(" Roll ");
+  Serial.println(attitude.roll / 3.141592 * 180.0);
 }
+
+// Variation
+
 void tState::handleMagneticVariation(const tN2kMsg &N2kMsg)
 {
 
@@ -491,6 +531,8 @@ void tState::handleMagneticVariation(const tN2kMsg &N2kMsg)
   variation.value = Variation;
 }
 
+// Position Rapid Update
+
 void tState::handlePositionRapidUpdate(const tN2kMsg &N2kMsg)
 {
 
@@ -502,7 +544,21 @@ void tState::handlePositionRapidUpdate(const tN2kMsg &N2kMsg)
   position.origin = N2kMsg.Source;
   position.latitude = Latitude;
   position.longitude = Longitude;
+
+  if (!verbose)
+  {
+    return;
+  }
+  Serial.println("Position Rapid Update");
+  Serial.print("Source ");
+  Serial.print(N2kMsg.Source);
+  Serial.print(" Latitude");
+  Serial.print(position.latitude);
+  Serial.print(" Longitude ");
+  Serial.println(position.longitude);
 }
+
+// COGSOG Rapid Update
 
 void tState::handleCOGSOGRapidUpdate(const tN2kMsg &N2kMsg)
 {
@@ -522,6 +578,8 @@ void tState::handleCOGSOGRapidUpdate(const tN2kMsg &N2kMsg)
   sog.origin = N2kMsg.Source;
   sog.value = SOG;
 }
+
+// GNSS . Only use position for the moment. Other data may be interesting if an accident or erroneus position
 
 void tState::handleGNSS(const tN2kMsg &N2kMsg)
 {
@@ -564,6 +622,23 @@ void tState::handleGNSS(const tN2kMsg &N2kMsg)
   // There is much much more info that I don't know if they are very useful
 }
 
+// Handle rapig engine parameters
+
+void tState::handleEngineParamRapid(const tN2kMsg &N2kMsg)
+{
+  unsigned char EngineInstance;
+  double EngineSpeed;
+  double EngineBoostPressure;
+  int8_t EngineTiltTrim;
+
+  ParseN2kEngineParamRapid(N2kMsg,EngineInstance,EngineSpeed,EngineBoostPressure,EngineTiltTrim);
+
+  rpm.when = time(nullptr);
+  rpm.origin = N2kMsg.Source;
+  rpm.value = EngineSpeed;
+ 
+}
+
 void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose)
 {
   this->verbose = verbose;
@@ -572,8 +647,12 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
   {
   case 126992:
     handleSystemDateTime(N2kMsg);
-
     break;
+
+    case 127237:
+    handleHeadingTrackControl(N2kMsg);
+    break;
+
   case 127245:
     // Serial.println("Received rudder angle info (127245  )");
     handleRudderCommand(N2kMsg);
@@ -595,6 +674,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleMagneticVariation(N2kMsg);
     break;
 
+  case 127488:
+    handleEngineParamRapid(N2kMsg);
+    break;
+    
   case 128259:
     // Serial.println("Received water speed (127259)");
     break;
@@ -623,9 +706,7 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleRouteInfo(N2kMsg);
     break;
 
-  case 127237:
-    handleHeadingTrackControl(N2kMsg);
-    break;
+
 
   case 130306:
     handleWind(N2kMsg);
@@ -666,8 +747,11 @@ void tState::tState::printInfo()
 /*
 
     Exporting data. Supports CSV and GPX formats
+    May have a header and a footer.
 
 */
+
+// Exports a record (an instant) to the csv file
 
 void tState::saveCsv(File f)
 {
@@ -684,7 +768,7 @@ void tState::saveCsv(File f)
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t%f\t", magneticHeading.heading / PI * 180.0, trueHeading.heading / PI * 180.0, rudderAngle.value);
   f.print(buffer);
-  sprintf(buffer, "%f\t%f\t%f\t",  attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
+  sprintf(buffer, "%f\t%f\t%f\t", attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", apparentWind.angle / PI * 180.0, apparentWind.speed * 3600.0 / 1852.0);
   f.print(buffer);
@@ -696,11 +780,15 @@ void tState::saveCsv(File f)
   f.print(buffer);
   f.println();
 }
+// Stores the csv header with field names
 
 void tState::saveCsvHeader(File f)
 {
   f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
 }
+
+// Export an extended trakpt. There are a lot of particular extensions
+
 void tState::saveGPXTrackpoint(File f)
 {
   char buffer[100];
@@ -746,7 +834,7 @@ void tState::saveGPXTrackpoint(File f)
 
   f.println("</sea:ext>");
   f.println("<met:ext>");
-  sprintf(buffer, "<met:gwd>%f</met:gwd>", trueWind.angle/  PI * 180.0);
+  sprintf(buffer, "<met:gwd>%f</met:gwd>", trueWind.angle / PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<met:gws>%f</met:gws>", trueWind.speed);
   f.println(buffer);
@@ -763,6 +851,7 @@ void tState::saveGPXTrackpoint(File f)
   f.println("</trkpt>");
 }
 
+// Stores the GPX SMK header and the start of trk and trkseg
 void tState::saveGPXHeader(File f, char *name)
 {
   f.println("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
@@ -783,6 +872,8 @@ void tState::saveGPXHeader(File f, char *name)
   f.println("</name>");
   f.println("<trkseg>");
 }
+
+// Stores the end of trkseg, trk and gpx
 
 void tState::saveGPXFooter(File f)
 {
@@ -856,6 +947,8 @@ bool tState::parseObj(JsonObject obj)
   }
   return found;
 }
+
+// Once parsed the JSON we store the values following the path
 
 void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVariant &value)
 {

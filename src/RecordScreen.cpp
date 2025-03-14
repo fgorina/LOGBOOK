@@ -88,7 +88,8 @@ void RecordScreen::draw_data()
 
 }
 
-int RecordScreen::run()
+int RecordScreen::
+run()
 {
     
     if (millis() - old_second_millis >= 1000){
