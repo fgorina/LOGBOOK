@@ -217,6 +217,23 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
   }
 }
 
+// Rudder command is not used for the moment
+void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
+{
+
+  double RudderPosition;
+  unsigned char Instance;
+  tN2kRudderDirectionOrder RudderDirectionOrder;
+  double AngleOrder;
+  ParseN2kRudder(N2kMsg, RudderPosition, Instance, RudderDirectionOrder, AngleOrder);
+
+  rudderAngle.when = time(nullptr);
+  rudderAngle.origin = N2kMsg.Source;
+  rudderAngle.value = RudderPosition;
+
+  // Disregard order!!!
+}
+
 // Navigation Info. Not used in Logbook for the moment
 
 void tState::handleNavigationInfo(const tN2kMsg &N2kMsg)
@@ -410,22 +427,7 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
   Serial.println(windReference);
 }
 
-// Rudder command is not used for the moment
-void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
-{
 
-  double RudderPosition;
-  unsigned char Instance;
-  tN2kRudderDirectionOrder RudderDirectionOrder;
-  double AngleOrder;
-  ParseN2kRudder(N2kMsg, RudderPosition, Instance, RudderDirectionOrder, AngleOrder);
-
-  rudderAngle.when = time(nullptr);
-  rudderAngle.origin = N2kMsg.Source;
-  rudderAngle.value = RudderPosition;
-
-  // Disregard order!!!
-}
 
 // Heading. Also updates deviation and variation
 
