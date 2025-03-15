@@ -551,13 +551,13 @@ void startWebServer()
   server.begin();
   Serial.println("HTTP server started");
 }
-boolean startWiFiAP(){
+boolean startWiFiAP()
+{
   Serial.println("Creating wifi logbook / 123456 ");
   WiFi.mode(wifi_mode_t::WIFI_MODE_AP);
   WiFi.softAP("logbook", "12345678");
   IPAddress IP = WiFi.softAPIP();
   Serial.println("Ip : " + IP.toString());
-
 
   // Start mdns so we have a name
 
@@ -572,69 +572,71 @@ boolean startWiFiAP(){
 
   startWebServer();
   starting = false;
- return true;
+  return true;
 }
 boolean startWiFi()
 { // Check whether there is wifi configuration information storage, if there is return 1, if no return 0.
 
   // WiFi.setAutoConnect(true);
 
-    Serial.println("Connecting to ");
+  Serial.println("Connecting to ");
+  Serial.print(wifi_ssid);
+  Serial.print(" ");
+  Serial.println(wifi_password);
+  WiFi.mode(wifi_mode_t::WIFI_MODE_STA);
+  WiFi.begin((char *)wifi_ssid.c_str(), (char *)wifi_password.c_str());
+
+  if (checkConnection())
+  {
+    Serial.print("Connected to ");
     Serial.print(wifi_ssid);
-    Serial.print(" ");
-    Serial.println(wifi_password);
-    WiFi.mode(wifi_mode_t::WIFI_MODE_STA);
-    WiFi.begin((char *)wifi_ssid.c_str(), (char *)wifi_password.c_str());
+    Serial.print(" IP ");
+    Serial.println(WiFi.localIP());
+    myIp = WiFi.localIP().toString();
 
-    if (checkConnection())
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo) || timeinfo.tm_year < 20)
     {
-      Serial.print("Connected to ");
-      Serial.print(wifi_ssid);
-      Serial.print(" IP ");
-      Serial.println(WiFi.localIP());
-      myIp = WiFi.localIP().toString();
-
-      struct tm timeinfo;
-      if (!getLocalTime(&timeinfo) || timeinfo.tm_year < 20)
-      {
-        configTime(0, 0, "europe.pool.ntp.org");
-        Serial.println("Synced RTC from NTP");
-      }
-      else
-      {
-        Serial.println("RTC already synced");
-      }
-
-      // Start mdns so we have a name
-
-      if (!MDNS.begin("logbook"))
-      {
-        Serial.println("Error setting up MDNS responder!");
-      }
-      else
-      {
-        Serial.println("mDNS responder started");
-      }
-      // Try to connect to signalk
-
-      if (skServer.length() > 0 && skPort > 0 && useSK)
-      {
-        skWsServer->begin(); // Connect to the SignalK TCP server
-      }
-
-      // Now start Web Server
-      startWebServer();
-
-      currentScreen->draw();
-      return true;
+      configTime(0, 0, "europe.pool.ntp.org");
+      Serial.println("Synced RTC from NTP");
     }
-    return false;
-  
+    else
+    {
+      Serial.println("RTC already synced");
+    }
+
+    // Start mdns so we have a name
+
+    if (!MDNS.begin("logbook"))
+    {
+      Serial.println("Error setting up MDNS responder!");
+    }
+    else
+    {
+      Serial.println("mDNS responder started");
+    }
+    // Try to connect to signalk
+
+    if (skServer.length() > 0 && skPort > 0 && useSK)
+    {
+      skWsServer->begin(); // Connect to the SignalK TCP server
+    }
+
+    // Now start Web Server
+    startWebServer();
+
+    currentScreen->draw();
+    return true;
+  }
+  return false;
 }
 
 void HandleNMEA2000Msg(const tN2kMsg &N2kMsg)
 {
-  state->HandleNMEA2000Msg(N2kMsg, analyze, verbose);
+  if (N2kMsg.Source == 15)
+  {
+    state->HandleNMEA2000Msg(N2kMsg, analyze, verbose);
+  }
 }
 
 void setup_NMEA2000()
@@ -803,12 +805,14 @@ void setup()
   Serial.begin(115200);
 
   readPreferences();
-  if(!wifi_ssid.isEmpty()){
+  if (!wifi_ssid.isEmpty())
+  {
     splash();
-  }else{
+  }
+  else
+  {
     startWiFiAP();
   }
- 
 
   M5.Lcd.setFreeFont(&unicode_24px);
   M5.Lcd.setTextSize(1.0);
