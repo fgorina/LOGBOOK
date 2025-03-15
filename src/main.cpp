@@ -46,7 +46,7 @@
 // NMEA 2000
 
 bool analyze = false;
-bool verbose = true;
+bool verbose = false;
 
 tN2kDeviceList *pN2kDeviceList;
 
@@ -90,20 +90,20 @@ const unsigned char LogIndustryGroup = 4;            // Marine
 
 // Global variables + State
 
-#define DEV
+
 
 #ifdef DEV
 static String wifi_ssid = "elrond";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
 static String skServer = "192.168.001.150";  //"192.168.1.54";
 int skPort = 3000;
-bool useN2k = true;
-bool useSK = false;
+bool useN2k = false;
+bool useSK = true;
 #else
 static String wifi_ssid = "Yamato";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
-const char *skServer = "192.168.1.2";        //"192.168.1.54";
-const int skPort = 3000;
+static String skServer = "192.168.1.2";        //"192.168.1.54";
+int skPort = 3000;
 bool useN2k = true;
 bool useSK = false;
 #endif
@@ -855,11 +855,21 @@ void loopTask()
   }
 }
 
-#define GO_SLEEP_TIMEOUT 60000ul // 5 '
+#define GO_SLEEP_TIMEOUT 300000ul // 5 '
 
 void loop()
 {
   M5.update();
+  if(M5.Touch.changed){
+    last_touched = millis();
+    if (displaySaver == DISPLAY_SLEEPING){
+      M5.Lcd.wakeup();
+    }
+  }
+  if(millis() - last_touched > GO_SLEEP_TIMEOUT){
+    M5.Lcd.sleep();
+    displaySaver = DISPLAY_SLEEPING;
+  }
   if (useN2k)
   {
     NMEA2000.ParseMessages();
