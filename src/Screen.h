@@ -32,6 +32,7 @@ class Screen
         int width;
         int height;
         const char* title;
+        
 
     public:
     Screen(int width, int height, const char* title);

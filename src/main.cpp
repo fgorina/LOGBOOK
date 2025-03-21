@@ -11,6 +11,7 @@
 #include <Free_Fonts.h>
 #include <time.h>
 #include <Preferences.h>
+#include "esp_task_wdt.h"
 #include <NMEA2000_esp32.h>
 #include <NMEA2000_CAN.h>
 #include <N2kMessages.h>
@@ -36,12 +37,15 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 #endif
 
+#include "Utils.h"
 // Screens
 
 #include "MenuScreen.h"
 #include "SDScreen.h"
 #include "RecordScreen.h"
 #include "WaitScreen.h"
+#include "InfoScreen.h"
+#include "N2KDevices.h"
 
 // NMEA 2000
 
@@ -90,8 +94,6 @@ const unsigned char LogIndustryGroup = 4;            // Marine
 
 // Global variables + State
 
-
-
 #ifdef DEV
 static String wifi_ssid = "elrond";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
@@ -102,11 +104,16 @@ bool useSK = true;
 #else
 static String wifi_ssid = "Yamato";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
-static String skServer = "192.168.1.2";        //"192.168.1.54";
+static String skServer = "192.168.1.2";      //"192.168.1.54";
 int skPort = 3000;
 bool useN2k = true;
 bool useSK = false;
 #endif
+
+#define MAX_SOURCES 20
+static String n2kSources = "15";
+int sources[MAX_SOURCES] = {15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int n_sources = 1;
 
 // static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
 
@@ -118,11 +125,6 @@ long lastTime = millis();
 static unsigned long last_message;
 static unsigned long last_touched;
 
-#define DISPLAY_ACTIVE 0
-#define DISPLAY_SLEEPING 1
-#define DISPLAY_WAKING 2
-
-static int displaySaver = DISPLAY_ACTIVE;
 static char buffer[64];
 
 Screen *currentScreen = nullptr;
@@ -150,11 +152,12 @@ NetSignalkWS *skWsServer = new NetSignalkWS(skServer.c_str(), skPort, state);
 
 // Screens
 
-Screen *screens[4] = {
-    new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
+Screen *screens[5] = {
+    new MenuScreen(state, TFT_HOR_RES, TFT_VER_RES, "Logs"),
     new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 1000),
-    new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs"),
-    new WaitScreen(TFT_HOR_RES, TFT_VER_RES, "Configure"),
+    new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs", state),
+    new InfoScreen(wifi_ssid, &myIp, &useN2k, &useSK, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
+    nullptr,
 
 };
 
@@ -180,7 +183,8 @@ void writePreferences()
   preferences.putBool("FILEFORMAT", ((RecordScreen *)screens[1])->xmlFormat);
   preferences.putBool("USEN2K", useN2k);
   preferences.putBool("USESK", useSK);
-
+  n2kSources = join(sources, MAX_SOURCES, ',');
+  preferences.putString("N2KSOURCES", n2kSources);
   preferences.end();
 }
 
@@ -195,6 +199,13 @@ void readPreferences()
 
   useN2k = preferences.getBool("USEN2K", false);
   useSK = preferences.getBool("USESK", false);
+  
+
+  n2kSources = preferences.getString("N2KSOURCES", n2kSources);
+  n_sources = splitter((char*) (n2kSources.c_str()), sources, ',', n2kSources.length(), MAX_SOURCES);
+  for(int i = n_sources; i < MAX_SOURCES; i++){
+    sources[i] = -1;
+  }
 
   preferences.end();
   Serial.println("============== Preferences ================= ");
@@ -212,6 +223,14 @@ void readPreferences()
   Serial.println(useN2k);
   Serial.print("use SignalK : ");
   Serial.println(useSK);
+  Serial.print("Sources : ");
+  for(int i = 0; i < MAX_SOURCES; i++){
+    if (sources[i] >= 0){
+      Serial.print(sources[i]);
+      Serial.print(",");
+    }
+  }
+  Serial.println();
   Serial.println("============================================ ");
 }
 // Web server handlers
@@ -433,6 +452,7 @@ void deleteFile(String uri)
 void handlePreferences()
 {
   Serial.println("handlePreferences");
+  n2kSources = join(sources, MAX_SOURCES, ',');
   String output = "<html><head><title>Prefer&egrave;ncies</title></head><body>";
   output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Prefer&egrave;ncies</h1>";
   output += "<form action=\"" + getFullUri("updatePrefs") + "\" method=\"post\">";
@@ -443,6 +463,7 @@ void handlePreferences()
   output += "<tr><td><label for=\"skport\">SignalK Port:</label></td><td><input type=\"number\" id=\"skport\" name=\"skport\" value=\"" + String(skPort) + "\"></td></tr>";
   output += "<tr><td><label for=\"usexml\">Use GPX:</label></td><td><input type=\"checkbox\" id=\"usexml\" name=\"usexml\" value=\"on\" " + String(((RecordScreen *)screens[1])->xmlFormat ? "checked" : "") + "></td></tr>";
   output += "<tr><td><label for=\"usen2k\">Use N2k:</label></td><td><input type=\"checkbox\" id=\"usen2k\" name=\"usen2k\" value=\"on\" " + String(useN2k ? "checked" : "") + "></td></tr>";
+  output += "<tr><td><label for=\"n2kdevices\">N2K Devices:</label></td><td><input type=\"text\" id=\"n2kdevices\" name=\"n2kdevices\" value=\"" + n2kSources + "\"></td></tr>";
   output += "<tr><td><label for=\"usesk\">Use SignalK:</label></td><td><input type=\"checkbox\" id=\"usesk\" name=\"usesk\" value=\"on\" " + String(useSK ? "checked" : "") + "></td></tr>";
   output += "<tr><td colspan=2 align=center><input type=\"submit\" value=\"Submit\"></td></tr>";
   output += "</table>";
@@ -499,7 +520,13 @@ void handleUpdatePreferences()
   {
     useSK = false;
   }
-
+  if (server.hasArg("n2kdevices")){
+    n2kSources = server.arg("n2kdevices");
+    n_sources = splitter((char*) (n2kSources.c_str()), sources, ',', n2kSources.length(), MAX_SOURCES);
+    for(int i = n_sources; i < MAX_SOURCES; i++){
+      sources[i] = -1;
+    }
+  }
   writePreferences();
   server.sendHeader("Location", getFullUri("index.html"), true);
   server.send(302, "text/plain", "");
@@ -507,6 +534,9 @@ void handleUpdatePreferences()
 
 void handleRestart()
 {
+  server.sendHeader("Location", getFullUri("index.html"), true);
+  server.send(302, "text/plain", "");
+  Serial.println("Restarting");
   ESP.restart();
 }
 // WiFI
@@ -604,7 +634,7 @@ boolean startWiFi()
     {
       Serial.println("RTC already synced");
     }
-
+    vTaskDelay(5);
     // Start mdns so we have a name
 
     if (!MDNS.begin("logbook"))
@@ -616,24 +646,38 @@ boolean startWiFi()
       Serial.println("mDNS responder started");
     }
     // Try to connect to signalk
-
+    vTaskDelay(5);
     if (skServer.length() > 0 && skPort > 0 && useSK)
     {
       skWsServer->begin(); // Connect to the SignalK TCP server
     }
-
+    vTaskDelay(5);
     // Now start Web Server
     startWebServer();
-
+    vTaskDelay(5);
     currentScreen->draw();
     return true;
   }
   return false;
 }
 
+// Returns true if source is in sources
+bool checkSource(unsigned char source){
+  if(n_sources == 0){
+    return true;
+  }
+
+  for(int i = 0; i < n_sources; i++){
+    if(sources[i] == source){
+      return true;
+    }
+  }
+  return false;
+}
+
 void HandleNMEA2000Msg(const tN2kMsg &N2kMsg)
 {
-  if (N2kMsg.Source == 15)
+  if (checkSource(N2kMsg.Source))
   {
     state->HandleNMEA2000Msg(N2kMsg, analyze, verbose);
   }
@@ -682,6 +726,7 @@ void setup_NMEA2000()
 
     */
   pN2kDeviceList = new tN2kDeviceList(&NMEA2000);
+  screens[4] = new N2KDevices(pN2kDeviceList, TFT_HOR_RES,  TFT_VER_RES, "Devices");
   NMEA2000.Open();
 }
 
@@ -713,9 +758,12 @@ void switchTo(int i)
 /// Tasks
 
 TaskHandle_t taskNetwork;
+TaskHandle_t taskN2K;
+TaskHandle_t taskWss;
 
 void networkTask(void *parameter)
 {
+
   while (true)
   {
     if (!checkConnection() && !wifi_ssid.isEmpty())
@@ -724,10 +772,56 @@ void networkTask(void *parameter)
     }
 
     server.handleClient();
-
-    vTaskDelay(1);
+   
+    vTaskDelay(10);
   }
 }
+
+void n2KTask(void *parameter)
+{
+
+  while (true)
+  {
+   
+    if (useN2k)
+    {
+      NMEA2000.ParseMessages();
+    }
+
+    vTaskDelay(10);
+  }
+}
+
+void wssTask(void *parameter)
+{
+
+  while (true)
+  {   
+    if (useSK && checkConnection())
+    {
+      skWsServer->run();
+    }
+    vTaskDelay(10);
+  }
+}
+void uiTask(void *parameter)
+{
+
+    if (currentScreen != nullptr)
+    {
+      int newScreen = currentScreen->run();
+
+      if (newScreen >= 0 && newScreen < 5)
+      {
+        Serial.println("About to switch");
+        switchTo(newScreen);
+      }
+    }
+
+}
+
+
+
 void resetNetwork()
 {
   // Sets preferences to work as STA
@@ -797,13 +891,14 @@ void splash()
   return;
 }
 
+
 void setup()
 {
 
   M5.begin();
   M5.Lcd.setRotation(3);
   Serial.begin(115200);
-
+  M5.Lcd.wakeup();
   readPreferences();
   if (!wifi_ssid.isEmpty())
   {
@@ -822,14 +917,25 @@ void setup()
   {
     setup_NMEA2000();
   }
-  last_touched = millis();
+  
 
   // M5.Lcd.wakeup();
-  Serial.println("Entering Menu Screen");
-  xTaskCreatePinnedToCore(networkTask, "TaskNetwork", 4000, NULL, 1, &taskNetwork, 0);
+  Serial.println("Atarting Tasks");
+  xTaskCreate(networkTask, "NetworkTask",4000,NULL,1,&taskNetwork);
+  Serial.println("Network Task Created");
+  if(useN2k){ 
+     xTaskCreate(n2KTask, "N2kTask",4000,NULL,1,&taskN2K);
+     Serial.println("N2K Task Created");
+  }
 
+  if(useSK){
+    xTaskCreate(wssTask, "WSS Task",4000,NULL,1,&taskWss);
+    Serial.println("WSS Task Created");
+  }
+ 
   // currentScreen = new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs");
 
+  Serial.println("Opening main screen");
   if (wifi_ssid.isEmpty())
   {
     currentScreen = screens[3];
@@ -839,45 +945,41 @@ void setup()
     currentScreen = screens[0];
   }
   currentScreen->enter();
-}
-void loopTask()
-{
+  last_touched = millis();
 
-  if (currentScreen != nullptr)
-  {
-    int newScreen = currentScreen->run();
-
-    if (newScreen >= 0 && newScreen < 5)
-    {
-      Serial.println("About to switch");
-      switchTo(newScreen);
-    }
-  }
 }
 
-#define GO_SLEEP_TIMEOUT 300000ul // 5 '
+#define GO_SLEEP_TIMEOUT 30000ul // 5 '
+
+void* p;
 
 void loop()
 {
   M5.update();
-  if(M5.Touch.changed){
+  uiTask(p);
+  if (M5.Touch.changed)
+  {
     last_touched = millis();
-    if (displaySaver == DISPLAY_SLEEPING){
+    Serial.println("Touched");
+    if (state->displaySaver == DISPLAY_SLEEPING && M5.Touch.ispressed())
+    {
+      Serial.println("Waking Up");
       M5.Lcd.wakeup();
+      state->displaySaver = DISPLAY_WAKING;
+    }
+    else if (state->displaySaver == DISPLAY_WAKING && !M5.Touch.ispressed())
+    {
+      Serial.println("Activating");
+      state->displaySaver = DISPLAY_ACTIVE;
+      last_touched = millis();
     }
   }
-  if(millis() - last_touched > GO_SLEEP_TIMEOUT){
+  if (millis() - last_touched  > GO_SLEEP_TIMEOUT && state->displaySaver == DISPLAY_ACTIVE )
+  {
+    Serial.println("Going to Sleep");
     M5.Lcd.sleep();
-    displaySaver = DISPLAY_SLEEPING;
+    state->displaySaver = DISPLAY_SLEEPING;
   }
-  if (useN2k)
-  {
-    NMEA2000.ParseMessages();
-  }
-  if (useSK)
-  {
-    skWsServer->run();
-  }
-  loopTask();
-  vTaskDelay(1);
+
+  vTaskDelay(20);
 }

@@ -9,6 +9,8 @@
 #include "PyTypes.h"
 #include <ArduinoJson.h>
 
+#include "Constants.h"
+
 
 
 class tState
@@ -17,6 +19,8 @@ protected:
 
     bool verbose = false;
     bool timeSet = false;
+
+
 
     void setupTime(time_t t);
     void setupTimeSK(String datetime);
@@ -44,7 +48,7 @@ protected:
     void update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVariant &value);
     
 public:
-    
+    int displaySaver = DISPLAY_ACTIVE;
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};
     tDoubleData sog{when : 0, origin : 0, value : 0.0}; // Speed in m/s
     tDoubleData stw{when : 0, origin : 0, value : 0.0}; // Speed through water in m/s

@@ -5,7 +5,6 @@
 #include <Arduino.h>
 #include <M5Tough.h>
 
-
 RecordScreen::RecordScreen(int width, int height, const char *title, tState *state, time_t period) : Screen(width, height, title)
 {
     this->state = state;
@@ -91,7 +90,6 @@ void RecordScreen::draw_data()
 int RecordScreen::
 run()
 {
-    
     if (millis() - old_second_millis >= 1000){
         old_second_millis = millis();
         draw_data();
@@ -120,7 +118,7 @@ run()
             draw_distance();
         }
     }
-    if (brecord != nullptr && brecord->wasReleased())
+    if (brecord != nullptr && brecord->wasReleased() && state->displaySaver ==  DISPLAY_ACTIVE)
     {
         if(!recording){
             startRecord();
@@ -130,8 +128,8 @@ run()
             return 0;
         }
         
-        return (0);
     }
+
     return -1;
 }
 

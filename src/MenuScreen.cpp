@@ -4,11 +4,10 @@
 #include "Arduino.h"
 #include <WiFi.h>
 
-
-
-MenuScreen::MenuScreen(int width, int height, const char *title) : Screen(width, height, title)
+MenuScreen::MenuScreen(tState *state, int width, int height, const char *title) : Screen(width, height, title)
 {
     Serial.println("MenuScreen::MenuScreen");
+    this->state = state;
 }
 
 MenuScreen::~MenuScreen()
@@ -25,8 +24,7 @@ void MenuScreen::enter()
 
     brecord = new Button(width / 4, 50, width / 2, 50, false, "Gravar", off_clrs, on_clrs, MC_DATUM);
     bfiles = new Button(width / 4, 110, width / 2, 50, false, "Logs", off_clrs, on_clrs, MC_DATUM);
-    binspector = new Button(width / 4, 170, width / 2, 50, false, "Inspector", off_clrs, on_clrs, MC_DATUM);
-   
+    binspector = new Button(width / 4, 170, width / 2, 50, false, "Info", off_clrs, on_clrs, MC_DATUM);
 
     draw();
 }
@@ -58,8 +56,6 @@ void MenuScreen::exit()
         delete (binspector);
         binspector = nullptr;
     }
-
-  
 }
 void MenuScreen::draw()
 {
@@ -67,7 +63,7 @@ void MenuScreen::draw()
     M5.Lcd.clear();
 
     M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString( WiFi.localIP().toString(), width / 2, 10);
+    M5.Lcd.drawString(WiFi.localIP().toString(), width / 2, 10);
     if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
     {
         brecord->draw();
@@ -80,25 +76,27 @@ void MenuScreen::draw()
 int MenuScreen::run()
 {
 
-    if (brecord != nullptr && brecord->wasReleased())
+    if (state->displaySaver == DISPLAY_ACTIVE)
     {
-        // Goto  Record
-        Serial.println("Record");
-        return (1);
-    }
-    if (bfiles != nullptr && bfiles->wasReleased())
-    {
-        // Goto files
-        Serial.println("Files");
-        return (2);
-    }
-    if (binspector != nullptr && binspector->wasReleased())
-    {
-        // Goto Inspector
-        Serial.println("Inspecting");
-        return (3);
-    }
-    
 
+        if (brecord != nullptr && brecord->wasReleased())
+        {
+            // Goto  Record
+            Serial.println("Record");
+            return (1);
+        }
+        if (bfiles != nullptr && bfiles->wasReleased())
+        {
+            // Goto files
+            Serial.println("Files");
+            return (2);
+        }
+        if (binspector != nullptr && binspector->wasReleased())
+        {
+            // Goto Inspector
+            Serial.println("Inspecting");
+            return (3);
+        }
+    }
     return -1;
 }

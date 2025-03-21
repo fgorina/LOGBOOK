@@ -4,6 +4,7 @@
 #define _SDScreen_H_
 
 #include "Screen.h"
+#include "State.h"
 
 #define  MAXFILES 100
 #define  MAXNAME 20
@@ -13,7 +14,7 @@
 class SDScreen : public Screen
 {   
     public:
-    SDScreen(int width, int height, const char* title);
+    SDScreen(int width, int height, const char* title, tState* state);
     void enter();
     void exit();
     void draw();
@@ -30,7 +31,7 @@ class SDScreen : public Screen
     Button *bexit = nullptr;
     Button *bup = nullptr;
     Button *bdown = nullptr; 
-
+    tState* state;
 
     void sortFiles();
     void loadSD();

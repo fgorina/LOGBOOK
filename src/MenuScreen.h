@@ -4,6 +4,7 @@
 #define _MENUScreen_H_
 #include <M5Tough.h>
 #include "Screen.h"
+#include "State.h"
 
 
 
@@ -13,7 +14,7 @@
 class MenuScreen : public Screen
 {   
     public:
-    MenuScreen(int width, int height, const char* title);
+    MenuScreen(tState* state, int width, int height, const char* title);
     ~MenuScreen();
     void enter();
     void exit();
@@ -21,7 +22,7 @@ class MenuScreen : public Screen
     int run();
 
     protected: 
-    
+    tState* state;
     Button *brecord = nullptr;
     Button *bfiles= nullptr;
     Button *binspector = nullptr;

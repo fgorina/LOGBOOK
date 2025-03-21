@@ -1,9 +1,9 @@
 #include "SDScreen.h"
 #include <M5Tough.h>
 
-SDScreen::SDScreen(int width, int height, const char *title) : Screen(width, height, title)
+SDScreen::SDScreen(int width, int height, const char *title, tState *state) : Screen(width, height, title)
 {
-  
+  this->state = state;
 }
 void SDScreen::enter()
 {
@@ -67,7 +67,7 @@ int SDScreen::run()
   {
     do_select_file();
   }
-  if (bexit != nullptr && bexit->wasReleased())
+  if (bexit != nullptr && bexit->wasReleased() && state->displaySaver == DISPLAY_ACTIVE)
   {
     return (0);
   }

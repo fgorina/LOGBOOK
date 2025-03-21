@@ -14,7 +14,7 @@ protected:
   int port;
   tState *state;
   unsigned long lastMillis = 0;
-  unsigned long timeout = 10000;
+  unsigned long timeout = 3000000;
   bool started = false;
 
   char buff[300];
