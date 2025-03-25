@@ -316,8 +316,8 @@ void  RecordScreen::saveFooter(File f){
 
 void RecordScreen::saveData(File f){
     if(xmlFormat){
-        state->saveGPXTrackpoint(f);
+        state->saveGPXTrackpoint(f, miles);
     }else{
-        state->saveCsv(f);
+        state->saveCsv(f, miles);
     }
 }

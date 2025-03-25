@@ -755,14 +755,14 @@ void tState::tState::printInfo()
 
 // Exports a record (an instant) to the csv file
 
-void tState::saveCsv(File f)
+void tState::saveCsv(File f, double distance)
 {
   char buffer[100];
   struct tm timeinfo;
   getLocalTime(&timeinfo);
 
   strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
-  sprintf(buffer, "%s\t", buffer);
+  sprintf(buffer, "%s\t%f\t", buffer, distance);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", position.longitude, position.latitude);
   f.print(buffer);
@@ -786,12 +786,12 @@ void tState::saveCsv(File f)
 
 void tState::saveCsvHeader(File f)
 {
-  f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
+  f.println("UTC\tDistance\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions
 
-void tState::saveGPXTrackpoint(File f)
+void tState::saveGPXTrackpoint(File f, double distance)
 {
   char buffer[100];
   struct tm timeinfo;
@@ -811,6 +811,8 @@ void tState::saveGPXTrackpoint(File f)
   sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading / PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<pvt:sog>%f</pvt:sog>", sog.value);
+  f.println(buffer);
+  sprintf(buffer, "<pvt:dist>%f</pvt:dist>", distance * 1852.0);  // Distance in meters
   f.println(buffer);
   f.println("</pvt:ext>");
 

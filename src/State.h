@@ -57,6 +57,7 @@ public:
 
     tHeadingData magneticHeading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
     tHeadingData trueHeading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // ap.heading
+    tHeadingData pypilotHeading{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0}; // pypilot heading
     tDoubleData deviation{when : 0, origin : 0, value : 0.0};
     tDoubleData variation{when : 0, origin : 0, value : 0.0};
 
@@ -92,9 +93,9 @@ public:
     void HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose);
 
     void printInfo();
-    void saveCsv(File f);
+    void saveCsv(File f, double distance);
     void saveCsvHeader(File f);
-    void saveGPXTrackpoint(File f);
+    void saveGPXTrackpoint(File f, double distance);
     void saveGPXHeader(File f, char* name);
     void saveGPXFooter(File f);
     bool signalk_parse_ws(String msg);
