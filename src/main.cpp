@@ -920,7 +920,7 @@ void setup()
   
 
   // M5.Lcd.wakeup();
-  Serial.println("Atarting Tasks");
+  Serial.println("Starting Tasks");
   xTaskCreate(networkTask, "NetworkTask",4000,NULL,1,&taskNetwork);
   Serial.println("Network Task Created");
   if(useN2k){ 

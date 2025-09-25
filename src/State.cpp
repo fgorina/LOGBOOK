@@ -641,6 +641,30 @@ void tState::handleEngineParamRapid(const tN2kMsg &N2kMsg)
  
 }
 
+void tState::handleEngineDynamicParameters(const tN2kMsg &N2kMsg)
+{
+unsigned char EngineInstance;
+double EngineOilPress;
+double EngineOilTemp;
+double EngineCoolantTemp;
+double AltenatorVoltage;
+double FuelRate;
+double EngineHours;
+double EngineCoolantPress;
+double EngineFuelPress;
+int8_t EngineLoad;
+int8_t EngineTorque;
+
+  ParseN2kEngineDynamicParam(N2kMsg, EngineInstance, EngineOilPress,
+                      EngineOilTemp, EngineCoolantTemp, AltenatorVoltage,
+                      FuelRate, EngineHours,EngineCoolantPress, EngineFuelPress,
+                      EngineLoad, EngineTorque);
+
+  engineTemperature.when = time(nullptr);
+  engineTemperature.origin = N2kMsg.Source;
+  engineTemperature.value = EngineCoolantTemp;
+ 
+} 
 void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose)
 {
   this->verbose = verbose;
@@ -651,7 +675,7 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleSystemDateTime(N2kMsg);
     break;
 
-    case 127237:
+    case 127237:  
     handleHeadingTrackControl(N2kMsg);
     break;
 
@@ -678,6 +702,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
 
   case 127488:
     handleEngineParamRapid(N2kMsg);
+    break;
+
+  case 127489:
+    handleEngineDynamicParameters(N2kMsg);
     break;
     
   case 128259:
