@@ -216,6 +216,39 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
     Serial.println("------------------------------------------------------------------------------");
   }
 }
+void tState::handleDepth(const tN2kMsg &N2kMsg){
+
+  unsigned char SID;
+  double DepthBelowTransducer;
+  double Offset;
+  double Range;
+
+
+
+  ParseN2kWaterDepth(N2kMsg, SID, DepthBelowTransducer, Offset, Range);
+
+  depth.when = time(nullptr);
+  depth.origin = N2kMsg.Source;
+  depth.value = DepthBelowTransducer + Offset;
+
+}
+
+void tState::handleTemperature(const tN2kMsg &N2kMsg){
+
+  unsigned char SID;
+  unsigned char TempInstance;
+  tN2kTempSource TempSource;
+  double ActualTemperature;
+  double SetTemperature;
+
+  ParseN2kTemperature(N2kMsg, SID, TempInstance, TempSource, ActualTemperature, SetTemperature);
+
+  
+  engineTemperature.when = time(nullptr);
+  engineTemperature.origin = N2kMsg.Source;
+  engineTemperature.value = ActualTemperature;
+
+}
 
 // Rudder command is not used for the moment
 void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
@@ -668,7 +701,7 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
   this->verbose = verbose;
 
   if (!(N2kMsg.Source == 15 ||
-      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312)))){
+      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312 || N2kMsg.PGN == 127245)))){
         return;
       }
   switch (N2kMsg.PGN)
@@ -710,6 +743,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     // Serial.println("Received water speed (127259)");
     break;
 
+  case 128267:
+    handleDepth(N2kMsg);
+    break;
+
   case 129025:
     handlePositionRapidUpdate(N2kMsg);
     break;
@@ -734,10 +771,12 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleRouteInfo(N2kMsg);
     break;
 
-
-
   case 130306:
     handleWind(N2kMsg);
+    break;
+
+  case 130312:
+    handleTemperature(N2kMsg);
     break;
 
   default:

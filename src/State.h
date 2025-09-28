@@ -31,6 +31,8 @@ protected:
     void handleRouteInfo(const tN2kMsg &N2kMsg);
     void handleWind(const tN2kMsg &N2kMsg);
     void handleRudderCommand(const tN2kMsg &N2kMsg);
+    void handleDepth(const tN2kMsg &N2kMsg);
+    void handleTemperature(const tN2kMsg &N2kMsg);
     void handleHeading(const tN2kMsg &N2kMsg);
     void handleRateOfTurn(const tN2kMsg &N2kMsg);
     void handleAttitude(const tN2kMsg &N2kMsg);
