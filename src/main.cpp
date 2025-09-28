@@ -112,7 +112,7 @@ bool useSK = false;
 
 #define MAX_SOURCES 20
 static String n2kSources = "15";
-int sources[MAX_SOURCES] = {15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int sources[MAX_SOURCES] = {15, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int n_sources = 1;
 
 // static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);

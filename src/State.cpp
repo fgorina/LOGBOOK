@@ -442,20 +442,41 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
   ParseN2kHeading(N2kMsg, SID, Heading, Deviation, Variation, ref);
 
   time_t now = time(nullptr);
+  
+  double d = 0.0;
+  if (Variation > -1000.00){
+    d += Variation;
+  }
 
+  if (Deviation > -1000.00){
+    d += Deviation;
+  }
+  
   if (ref == tN2kHeadingReference::N2khr_magnetic)
   {
+
     magneticHeading.when = now;
     magneticHeading.origin = N2kMsg.Source;
     magneticHeading.reference = ref;
     magneticHeading.heading = Heading;
+
+    trueHeading.when = now;
+    trueHeading.origin = N2kMsg.Source;
+    trueHeading.reference = ref;
+    trueHeading.heading = Heading + d;
   }
   else if (ref == tN2kHeadingReference::N2khr_true)
   {
+
     trueHeading.when = now;
     trueHeading.origin = N2kMsg.Source;
     trueHeading.reference = ref;
     trueHeading.heading = Heading;
+
+     magneticHeading.when = now;
+    magneticHeading.origin = N2kMsg.Source;
+    magneticHeading.reference = ref;
+    magneticHeading.heading = Heading - d;
   }
 
   variation.when = now;
@@ -465,6 +486,7 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
   deviation.when = now;
   deviation.origin = N2kMsg.Source;
   deviation.value = Deviation;
+
 }
 
 // Rate Of Turn
@@ -645,6 +667,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
 {
   this->verbose = verbose;
 
+  if (!(N2kMsg.Source == 15 ||
+      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312)))){
+        return;
+      }
   switch (N2kMsg.PGN)
   {
   case 126992:
