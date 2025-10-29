@@ -49,6 +49,9 @@ void RecordScreen::draw()
 
 void RecordScreen::draw_distance()
 {
+    char buffer[MAXBUFFER];
+
+    
     M5.Lcd.setTextSize(1.5);
     M5.Lcd.fillRect(0, height - 80, width, 80, BLACK);
     M5.Lcd.fillRect(0, 40, width/2, height, BLACK);

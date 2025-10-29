@@ -965,6 +965,7 @@ void loop()
     {
       Serial.println("Waking Up");
       M5.Lcd.wakeup();
+      M5.Axp.SetLDOVoltage(3, 3000);
       state->displaySaver = DISPLAY_WAKING;
     }
     else if (state->displaySaver == DISPLAY_WAKING && !M5.Touch.ispressed())
@@ -978,6 +979,7 @@ void loop()
   {
     Serial.println("Going to Sleep");
     M5.Lcd.sleep();
+    M5.Axp.SetLDOVoltage(3, 1800);
     state->displaySaver = DISPLAY_SLEEPING;
   }
 
