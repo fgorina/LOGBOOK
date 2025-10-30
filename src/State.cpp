@@ -216,6 +216,39 @@ void tState::handleHeadingTrackControl(const tN2kMsg &N2kMsg)
     Serial.println("------------------------------------------------------------------------------");
   }
 }
+void tState::handleDepth(const tN2kMsg &N2kMsg){
+
+  unsigned char SID;
+  double DepthBelowTransducer;
+  double Offset;
+  double Range;
+
+
+
+  ParseN2kWaterDepth(N2kMsg, SID, DepthBelowTransducer, Offset, Range);
+
+  depth.when = time(nullptr);
+  depth.origin = N2kMsg.Source;
+  depth.value = DepthBelowTransducer + Offset;
+
+}
+
+void tState::handleTemperature(const tN2kMsg &N2kMsg){
+
+  unsigned char SID;
+  unsigned char TempInstance;
+  tN2kTempSource TempSource;
+  double ActualTemperature;
+  double SetTemperature;
+
+  ParseN2kTemperature(N2kMsg, SID, TempInstance, TempSource, ActualTemperature, SetTemperature);
+
+  
+  engineTemperature.when = time(nullptr);
+  engineTemperature.origin = N2kMsg.Source;
+  engineTemperature.value = ActualTemperature;
+
+}
 
 // Rudder command is not used for the moment
 void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
@@ -442,20 +475,41 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
   ParseN2kHeading(N2kMsg, SID, Heading, Deviation, Variation, ref);
 
   time_t now = time(nullptr);
+  
+  double d = 0.0;
+  if (Variation > -1000.00){
+    d += Variation;
+  }
 
+  if (Deviation > -1000.00){
+    d += Deviation;
+  }
+  
   if (ref == tN2kHeadingReference::N2khr_magnetic)
   {
+
     magneticHeading.when = now;
     magneticHeading.origin = N2kMsg.Source;
     magneticHeading.reference = ref;
     magneticHeading.heading = Heading;
+
+    trueHeading.when = now;
+    trueHeading.origin = N2kMsg.Source;
+    trueHeading.reference = ref;
+    trueHeading.heading = Heading + d;
   }
   else if (ref == tN2kHeadingReference::N2khr_true)
   {
+
     trueHeading.when = now;
     trueHeading.origin = N2kMsg.Source;
     trueHeading.reference = ref;
     trueHeading.heading = Heading;
+
+     magneticHeading.when = now;
+    magneticHeading.origin = N2kMsg.Source;
+    magneticHeading.reference = ref;
+    magneticHeading.heading = Heading - d;
   }
 
   variation.when = now;
@@ -465,6 +519,7 @@ void tState::handleHeading(const tN2kMsg &N2kMsg)
   deviation.when = now;
   deviation.origin = N2kMsg.Source;
   deviation.value = Deviation;
+
 }
 
 // Rate Of Turn
@@ -669,6 +724,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
 {
   this->verbose = verbose;
 
+  if (!(N2kMsg.Source == 15 ||
+      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312 || N2kMsg.PGN == 127245)))){
+        return;
+      }
   switch (N2kMsg.PGN)
   {
   case 126992:
@@ -712,6 +771,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     // Serial.println("Received water speed (127259)");
     break;
 
+  case 128267:
+    handleDepth(N2kMsg);
+    break;
+
   case 129025:
     handlePositionRapidUpdate(N2kMsg);
     break;
@@ -736,10 +799,12 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleRouteInfo(N2kMsg);
     break;
 
-
-
   case 130306:
     handleWind(N2kMsg);
+    break;
+
+  case 130312:
+    handleTemperature(N2kMsg);
     break;
 
   default:
@@ -783,14 +848,14 @@ void tState::tState::printInfo()
 
 // Exports a record (an instant) to the csv file
 
-void tState::saveCsv(File f)
+void tState::saveCsv(File f, double distance)
 {
   char buffer[100];
   struct tm timeinfo;
   getLocalTime(&timeinfo);
 
   strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
-  sprintf(buffer, "%s\t", buffer);
+  sprintf(buffer, "%s\t%f\t", buffer, distance);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", position.longitude, position.latitude);
   f.print(buffer);
@@ -814,12 +879,12 @@ void tState::saveCsv(File f)
 
 void tState::saveCsvHeader(File f)
 {
-  f.println("UTC\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
+  f.println("UTC\tDistance\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions
 
-void tState::saveGPXTrackpoint(File f)
+void tState::saveGPXTrackpoint(File f, double distance)
 {
   char buffer[100];
   struct tm timeinfo;
@@ -839,6 +904,8 @@ void tState::saveGPXTrackpoint(File f)
   sprintf(buffer, "<pvt:cog>%f</pvt:cog>", cog.heading / PI * 180.0);
   f.println(buffer);
   sprintf(buffer, "<pvt:sog>%f</pvt:sog>", sog.value);
+  f.println(buffer);
+  sprintf(buffer, "<pvt:dist>%f</pvt:dist>", distance * 1852.0);  // Distance in meters
   f.println(buffer);
   f.println("</pvt:ext>");
 
