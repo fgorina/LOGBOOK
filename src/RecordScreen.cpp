@@ -172,8 +172,10 @@ void RecordScreen::stopRecord()
     // Write data to file
     // Close file
     brecord->setLabel("Start");
+
     saveData(file);
     saveFooter(file);
+    file.flush();
     file.close();
     if( compressFile(filename) > 0){
         SD.remove(filename);
@@ -307,6 +309,7 @@ void  RecordScreen::saveHeader(File f, char* name){
         state->saveGPXHeader(f, name);
     }else{
         state->saveCsvHeader(f);
+        f.flush();
     }
 }
 
@@ -320,7 +323,9 @@ void  RecordScreen::saveFooter(File f){
 void RecordScreen::saveData(File f){
     if(xmlFormat){
         state->saveGPXTrackpoint(f, miles);
+        f.flush();
     }else{
         state->saveCsv(f, miles);
+        f.flush();
     }
 }
