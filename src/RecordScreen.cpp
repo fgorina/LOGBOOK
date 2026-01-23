@@ -86,12 +86,9 @@ void RecordScreen::draw_data()
     
     M5.Lcd.drawString(buffer, width / 2, 10);
 
-    
-
 }
 
-int RecordScreen::
-run()
+int RecordScreen::run()
 {
     if (millis() - old_second_millis >= 1000){
         old_second_millis = millis();
@@ -321,11 +318,15 @@ void  RecordScreen::saveFooter(File f){
 }
 
 void RecordScreen::saveData(File f){
+    rows_not_saved++;
+    bool doflush = rows_not_saved >= max_rows_not_saved;
+
     if(xmlFormat){
         state->saveGPXTrackpoint(f, miles);
-        f.flush();
+        if(doflush)f.flush();
     }else{
         state->saveCsv(f, miles);
-        f.flush();
+        if(doflush)f.flush();
     }
+    if(doflush) rows_not_saved = 0;
 }

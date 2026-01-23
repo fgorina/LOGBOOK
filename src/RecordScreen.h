@@ -33,6 +33,9 @@ class RecordScreen : public Screen
     time_t start_millis = 0; // millis at start of recprding
     time_t start_time = 0;  // Time at start of recording
 
+    int rows_not_saved = 0;
+    int max_rows_not_saved = 60;    // Aroun 1'
+
     double old_lat = 0;
     double old_lon = 0;
 
