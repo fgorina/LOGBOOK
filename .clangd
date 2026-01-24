@@ -1,0 +1,31 @@
+CompileFlags:
+  Add: [
+    "-std=gnu++17"
+  ]
+  Remove: [
+    "-fstrict-volatile-bitfields",
+    "-fno-tree-switch-conversion"
+  ]
+
+Diagnostics:
+  Suppress: [
+    "unused-includes",
+    "unused-parameter",
+    "unused-variable",
+    "unused-function",
+    "unused-private-field",
+    "unused-member-function",
+    "unused-template",
+    "unused-result",
+    "missing-prototypes",
+    "missing-variable-declarations",
+    "missing-field-initializers",
+    "missing-noreturn",
+    "missing-override",
+    "missing-braces",
+    "deprecated",
+    "reserved-user-defined-literal"
+  ]
+
+Index:
+  Background: Skip
