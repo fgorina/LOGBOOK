@@ -3,7 +3,6 @@
 
 #include "RecordScreen.h"
 #include <Arduino.h>
-#include <M5Tough.h>
 
 RecordScreen::RecordScreen(int width, int height, const char *title, tState *state, time_t period) : Screen(width, height, title)
 {
@@ -40,7 +39,7 @@ void RecordScreen::draw()
 {
 
     Serial.println("RecordScreen::draw");
-    M5.Lcd.clear();
+    M5.Display.clear();
 
     brecord->draw();
     draw_distance();
@@ -51,45 +50,46 @@ void RecordScreen::draw_distance()
 {
     char buffer[MAXBUFFER];
 
-  
-
-    M5.Lcd.setTextSize(1.5);
-    M5.Lcd.fillRect(0, height - 80, width, 80, BLACK);
-    M5.Lcd.fillRect(0, 40, width/2, height, BLACK);
-    M5.Lcd.setTextDatum(BL_DATUM);
+    M5.Display.setFont(&fonts::lgfxJapanGothic_24);
+    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+    M5.Display.fillRect(0, height - 80, width, 80, BLACK);
+    M5.Display.fillRect(0, 40, width/2, height, BLACK);
+    M5.Display.setTextDatum(BL_DATUM);
     duration(buffer, MAXBUFFER);
-    M5.Lcd.drawString(buffer, 10, height - 10);
-    M5.Lcd.setTextDatum(BR_DATUM);
+    M5.Display.drawString(buffer, 10, height - 10);
+    M5.Display.setTextDatum(BR_DATUM);
+
     distance(buffer, MAXBUFFER);
-    M5.Lcd.drawString(buffer, width - 10, height - 10);
+    M5.Display.drawString(buffer, width - 10, height - 10);
     // Now Show COG i SOG
 
-    M5.Lcd.setTextDatum(ML_DATUM);
+    M5.Display.setTextDatum(ML_DATUM);
     snprintf(buffer, MAXBUFFER, "COG %03.0f º", state->cog.heading/PI*180.0);
-    M5.Lcd.drawString(buffer, 19, 75);
+    M5.Display.drawString(buffer, 19, 75);
 
     snprintf(buffer, MAXBUFFER, "SOG %03.1f kt", state->sog.value * 3600.0 / 1852.0);
-    M5.Lcd.drawString(buffer, 19, 100);
+    M5.Display.drawString(buffer, 19, 100);
 
     snprintf(buffer, MAXBUFFER, "AWA %03.0f º", state->apparentWind.angle / PI * 180.0);
-    M5.Lcd.drawString(buffer, 19, 130);
+    M5.Display.drawString(buffer, 19, 130);
 
     snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->apparentWind.speed * 3600.0 / 1852.0);
-    M5.Lcd.drawString(buffer, 19, 155);
+    M5.Display.drawString(buffer, 19, 155);
 }
 
 void RecordScreen::draw_data()
 {
     updatedDateTime();
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.fillRect(0, 0, width, 40, BLACK);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
+    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+    M5.Display.setTextDatum(TC_DATUM);
+    M5.Display.fillRect(0, 0, width, 40, BLACK);
     
-    M5.Lcd.drawString(buffer, width / 2, 10);
+    M5.Display.drawString(buffer, width / 2, 10);
 
 }
 
-int RecordScreen::run()
+int RecordScreen::run(const m5::touch_detail_t &t)
 {
     if (millis() - old_second_millis >= 1000){
         old_second_millis = millis();
@@ -119,7 +119,7 @@ int RecordScreen::run()
             draw_distance();
         }
     }
-    if (brecord != nullptr && brecord->wasReleased() && state->displaySaver ==  DISPLAY_ACTIVE)
+    if (brecord != nullptr && state->displaySaver ==  DISPLAY_ACTIVE && brecord->handleTouch(t))
     {
         if(!recording){
             startRecord();
@@ -128,9 +128,7 @@ int RecordScreen::run()
             stopRecord();
             return 0;
         }
-        
     }
-
     return -1;
 }
 
@@ -185,8 +183,8 @@ void RecordScreen::stopRecord()
 size_t RecordScreen::compressFile( const String &inputFilename)
 {
   if(!SD.exists(inputFilename)) {
-    Serial.printf("Filesystem is missing '%s' file, halting\n", inputFilename.c_str());
-    while(1) yield();
+    Serial.printf("Filesystem is missing '%s' file, skipping compression\n", inputFilename.c_str());
+    return 0;
   }
 
   String gzFilename = inputFilename+".gz";

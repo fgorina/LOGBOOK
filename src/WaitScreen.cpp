@@ -19,19 +19,19 @@ void WaitScreen::exit()
 
 void WaitScreen::draw()
 {
-    M5.Lcd.setFreeFont(&FreeSans9pt7b);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
     Serial.println("WaitScreen::draw");
-    M5.Lcd.clear();
+    M5.Display.clear();
 
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString("Logbook", width/2, 10);
+    M5.Display.setTextDatum(TC_DATUM);
+    M5.Display.drawString("Logbook", width/2, 10);
 
-    M5.Lcd.setTextDatum(CC_DATUM);
-    M5.Lcd.drawString("Feu servir un navegador", width/2, 80);
-    M5.Lcd.drawString("per configurar Logbook", width/2, 120);
-    M5.Lcd.drawString("ssid: logbook / passws: 123456", width/2, 160);
+    M5.Display.setTextDatum(CC_DATUM);
+    M5.Display.drawString("Feu servir un navegador", width/2, 80);
+    M5.Display.drawString("per configurar Logbook", width/2, 120);
+    M5.Display.drawString("ssid: logbook / passws: 123456", width/2, 160);
 
-    M5.Lcd.drawString("url: http://logbook.local", width/2, 180);
+    M5.Display.drawString("url: http://logbook.local", width/2, 180);
 
 
 }

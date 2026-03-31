@@ -3,8 +3,13 @@ CompileFlags:
     "-std=gnu++17"
   ]
   Remove: [
+    "-mlongcalls",
+    "-mtext-section-literals",
     "-fstrict-volatile-bitfields",
-    "-fno-tree-switch-conversion"
+    "-fno-tree-switch-conversion",
+    "-fno-jump-tables",
+    "-Wno-frame-address",
+    "-Wno-error=unused-but-set-variable"
   ]
 
 Diagnostics:

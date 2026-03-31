@@ -51,33 +51,33 @@ void InfoScreen::draw()
     int pos = 40;
     int delta = 30;
 
-    M5.Lcd.setFreeFont(&FreeSans9pt7b);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
     Serial.println("InfoScreen::draw");
-    M5.Lcd.clear();
+    M5.Display.clear();
 
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString("Logbook", width / 2, 10);
+    M5.Display.setTextDatum(TC_DATUM);
+    M5.Display.drawString("Logbook", width / 2, 10);
 
-    M5.Lcd.setTextDatum(BL_DATUM);
-    M5.Lcd.drawString("SSID: " + ssid , 10, pos+=delta);
+    M5.Display.setTextDatum(BL_DATUM);
+    M5.Display.drawString("SSID: " + ssid , 10, pos+=delta);
 
-    M5.Lcd.drawString("IP: " + *ip , 10, pos+=delta);
-    M5.Lcd.drawString("N2K " + String(*useN2k ? "Si" : "No") + "     SK " + String(*useSK ? "Si" : "No") , 10, pos+=delta);
-    M5.Lcd.drawString("(" + *sources + ")" , 10, pos+=delta);
-    M5.Lcd.drawString("SK " + *skServer + " :" + *skPort, 10, pos+=delta);
+    M5.Display.drawString("IP: " + *ip , 10, pos+=delta);
+    M5.Display.drawString("N2K " + String(*useN2k ? "Si" : "No") + "     SK " + String(*useSK ? "Si" : "No") , 10, pos+=delta);
+    M5.Display.drawString("(" + *sources + ")" , 10, pos+=delta);
+    M5.Display.drawString("SK " + *skServer + " :" + *skPort, 10, pos+=delta);
 
-    M5.Lcd.setTextDatum(CC_DATUM);
+    M5.Display.setTextDatum(CC_DATUM);
     bexit->draw();
     bDevices->draw();
 }
 
-int InfoScreen::run()
+int InfoScreen::run(const m5::touch_detail_t &t)
 {
-    if (bDevices != nullptr && bDevices->wasReleased())
+    if (bDevices != nullptr && bDevices->handleTouch(t))
     {
         return (4);
     }
-    if (bexit != nullptr && bexit->wasReleased())
+    if (bexit != nullptr && bexit->handleTouch(t))
     {
         return (0);
     }

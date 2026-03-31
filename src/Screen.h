@@ -24,7 +24,8 @@
 #ifndef _Screen_H_
 #define _Screen_H_
 
-#include <M5Tough.h>
+#include <M5Unified.h>
+#include "M5Button.h"
 
 class Screen
 {
@@ -40,7 +41,7 @@ class Screen
     virtual void enter();
     virtual void exit();
     virtual void draw();
-    virtual int run();
+    virtual int run(const m5::touch_detail_t &t);
 
 };
 

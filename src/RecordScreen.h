@@ -11,10 +11,10 @@ class RecordScreen : public Screen
     public:
     bool xmlFormat = false;
     RecordScreen(int width, int height, const char* title, tState* state, time_t period); // period of writing in millis
-    void enter();
-    void exit();
-    void draw();
-    int run();
+    void enter() override;
+    void exit() override;
+    void draw() override;
+    int run(const m5::touch_detail_t &t) override;
 
     protected: 
     

@@ -1,6 +1,5 @@
 
 #include "MenuScreen.h"
-#include <M5Tough.h>
 #include "Arduino.h"
 #include <WiFi.h>
 
@@ -60,10 +59,12 @@ void MenuScreen::exit()
 void MenuScreen::draw()
 {
     Serial.println("MenuScreen::draw");
-    M5.Lcd.clear();
+    M5.Display.clear();
 
-    M5.Lcd.setTextDatum(TC_DATUM);
-    M5.Lcd.drawString(WiFi.localIP().toString(), width / 2, 10);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
+    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+    M5.Display.setTextDatum(TC_DATUM);
+    M5.Display.drawString(WiFi.localIP().toString(), width / 2, 10);
     if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
     {
         brecord->draw();
@@ -73,25 +74,23 @@ void MenuScreen::draw()
     // M5.Buttons.draw();
     Serial.println("Exit MenuScreen::draw");
 }
-int MenuScreen::run()
+int MenuScreen::run(const m5::touch_detail_t &t)
 {
-
     if (state->displaySaver == DISPLAY_ACTIVE)
     {
-
-        if (brecord != nullptr && brecord->wasReleased())
+        if (brecord != nullptr && brecord->handleTouch(t))
         {
             // Goto  Record
             Serial.println("Record");
             return (1);
         }
-        if (bfiles != nullptr && bfiles->wasReleased())
+        if (bfiles != nullptr && bfiles->handleTouch(t))
         {
             // Goto files
             Serial.println("Files");
             return (2);
         }
-        if (binspector != nullptr && binspector->wasReleased())
+        if (binspector != nullptr && binspector->handleTouch(t))
         {
             // Goto Inspector
             Serial.println("Inspecting");

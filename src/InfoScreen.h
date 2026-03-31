@@ -12,10 +12,10 @@ class InfoScreen : public Screen
 public:
     InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, String* skServer, int* skPort,  String* sources, int width, int height, const char *title);
 
-    void enter();
-    void exit();
-    void draw();
-    int run();
+    void enter() override;
+    void exit() override;
+    void draw() override;
+    int run(const m5::touch_detail_t &t) override;
 
 protected:
     Button *bexit = nullptr;

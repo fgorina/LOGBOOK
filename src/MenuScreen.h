@@ -2,7 +2,6 @@
 
 #ifndef _MENUScreen_H_
 #define _MENUScreen_H_
-#include <M5Tough.h>
 #include "Screen.h"
 #include "State.h"
 
@@ -19,7 +18,7 @@ class MenuScreen : public Screen
     void enter();
     void exit();
     void draw();
-    int run();
+    int run(const m5::touch_detail_t &t);
 
     protected: 
     tState* state;

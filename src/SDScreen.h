@@ -15,10 +15,10 @@ class SDScreen : public Screen
 {   
     public:
     SDScreen(int width, int height, const char* title, tState* state);
-    void enter();
-    void exit();
-    void draw();
-    int run();
+    void enter() override;;
+    void exit() override;;
+    void draw() override;;
+    int run(const m5::touch_detail_t &t) override;;
     bool exists(const char* name);
     
     protected: 
@@ -37,7 +37,7 @@ class SDScreen : public Screen
     void loadSD();
     void drawFile(int file, bool selected);
     void drawSD();
-    void do_select_file();
+    void do_select_file(int tx, int ty);
     
 
 

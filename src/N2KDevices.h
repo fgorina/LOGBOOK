@@ -13,10 +13,10 @@ class N2KDevices : public Screen
 public:
     N2KDevices(tN2kDeviceList* deviceList, int width, int height, const char *title);
 
-    void enter();
-    void exit();
-    void draw();
-    int run();
+    void enter() override;
+    void exit() override;
+    void draw() override;
+    int run(const m5::touch_detail_t &t) override;
 
 protected:
     Button *bexit = nullptr;

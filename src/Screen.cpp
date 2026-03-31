@@ -10,7 +10,7 @@ void Screen::enter() { draw(); }
 void Screen::exit() {}
 
 void Screen::draw() {}
-int Screen::run() {
+int Screen::run(const m5::touch_detail_t &t) {
   Serial.println("Screen::run");
   return -1;
 }

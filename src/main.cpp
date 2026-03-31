@@ -6,9 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
-#include <M5Tough.h>
-#include <CUF_24.h>
-#include <Free_Fonts.h>
+#include <M5Unified.h>
 #include <time.h>
 #include <Preferences.h>
 #include "esp_task_wdt.h"
@@ -152,13 +150,13 @@ NetSignalkWS *skWsServer = new NetSignalkWS(skServer.c_str(), skPort, state);
 
 // Screens
 
-Screen *screens[5] = {
+Screen *screens[6] = {
     new MenuScreen(state, TFT_HOR_RES, TFT_VER_RES, "Logs"),
     new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 1000),
     new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs", state),
     new InfoScreen(wifi_ssid, &myIp, &useN2k, &useSK, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
+    new N2KDevices(pN2kDeviceList, TFT_HOR_RES,  TFT_VER_RES, "N2k"),
     nullptr,
-
 };
 
 boolean startWiFi();
@@ -804,12 +802,12 @@ void wssTask(void *parameter)
     vTaskDelay(10);
   }
 }
-void uiTask(void *parameter)
+void uiTask(const m5::touch_detail_t &t)
 {
 
     if (currentScreen != nullptr)
     {
-      int newScreen = currentScreen->run();
+      int newScreen = currentScreen->run(t);
 
       if (newScreen >= 0 && newScreen < 5)
       {
@@ -844,36 +842,38 @@ void resetNetwork()
 
 void splash()
 {
-  M5.Lcd.clear();
+  M5.Display.clear();
   unsigned long s = millis();
   long press = -1;
   const unsigned long duration = 10000;
 
-  M5.Lcd.setFreeFont(&FreeSans9pt7b);
-  // We loop 5 seconds, just waiting for a network reset
-  M5.Lcd.setTextDatum(TC_DATUM);
-  M5.Lcd.drawString("Logbook", TFT_HOR_RES / 2, 10);
+  M5.Display.setFont(&fonts::FreeSans9pt7b);
+  // We loop 10 seconds, just waiting for a network reset
+  M5.Display.setTextDatum(TC_DATUM);
+  M5.Display.drawString("Logbook", TFT_HOR_RES / 2, 10);
 
-  M5.Lcd.setTextDatum(CL_DATUM);
-  M5.Lcd.drawString("SSID: " + wifi_ssid, 10, 50);
-  M5.Lcd.drawString("SK Server: " + skServer + ":" + skPort, 10, 90);
-  M5.Lcd.drawString("Use Nemea 2000: " + String(useN2k ? "Si" : "No"), 10, 130);
-  M5.Lcd.drawString("Use SignalK: " + String(useSK ? "Si" : "No"), 10, 170);
+  M5.Display.setTextDatum(CL_DATUM);
+  M5.Display.drawString("SSID: " + wifi_ssid, 10, 50);
+  M5.Display.drawString("SK Server: " + skServer + ":" + skPort, 10, 90);
+  M5.Display.drawString("Use Nemea 2000: " + String(useN2k ? "Si" : "No"), 10, 130);
+  M5.Display.drawString("Use SignalK: " + String(useSK ? "Si" : "No"), 10, 170);
 
-  M5.Lcd.setTextDatum(CC_DATUM);
-  M5.Lcd.drawString("Toqueu per reset", TFT_HOR_RES / 2, 200);
+  M5.Display.setTextDatum(CC_DATUM);
+  M5.Display.drawString("Toqueu per reset", TFT_HOR_RES / 2, 200);
 
   while (millis() - s < duration)
   {
     M5.update();
-    if (M5.Touch.changed)
+    auto count = M5.Touch.getCount();
+    if (count > 0)
     {
-      if (M5.Touch.ispressed())
+      auto t = M5.Touch.getDetail(0);
+      if (t.wasPressed())
       {
         press = millis();
-        Serial.println("Starting press");
+
       }
-      else
+      else if (t.wasReleased())
       {
         if (millis() - press > 1000)
         {
@@ -896,9 +896,9 @@ void setup()
 {
 
   M5.begin();
-  M5.Lcd.setRotation(3);
+  M5.Display.setRotation(1);
   Serial.begin(115200);
-  M5.Lcd.wakeup();
+  M5.Display.wakeup();
   readPreferences();
   if (!wifi_ssid.isEmpty())
   {
@@ -909,8 +909,8 @@ void setup()
     startWiFiAP();
   }
 
-  M5.Lcd.setFreeFont(&unicode_24px);
-  M5.Lcd.setTextSize(1.0);
+  M5.Display.setFont(&fonts::FreeSans12pt7b);
+  M5.Display.setTextSize(1.0);
   SD.begin();
 
   if (useN2k)
@@ -956,32 +956,40 @@ void* p;
 void loop()
 {
   M5.update();
-  uiTask(p);
-  if (M5.Touch.changed)
-  {
-    last_touched = millis();
-    Serial.println("Touched");
-    if (state->displaySaver == DISPLAY_SLEEPING && M5.Touch.ispressed())
+  auto &t = M5.Touch.getDetail(0);
+  uiTask(t);
+  
+    auto count = M5.Touch.getCount();
+    if (count > 0)
     {
-      Serial.println("Waking Up");
-      M5.Lcd.wakeup();
-      M5.Axp.SetLDOVoltage(3, 3000);
-      state->displaySaver = DISPLAY_WAKING;
+      
+      if (t.wasPressed() || t.wasReleased())
+      {
+        last_touched = millis();
+        Serial.println("Touched");
+        if (state->displaySaver == DISPLAY_SLEEPING && t.wasPressed())
+        {
+          Serial.println("Waking Up");
+          M5.Display.wakeup();
+          M5.Display.setBrightness(128);
+          state->displaySaver = DISPLAY_WAKING;
+        }
+        else if (state->displaySaver == DISPLAY_WAKING && t.wasReleased())
+        {
+          Serial.println("Activating");
+          state->displaySaver = DISPLAY_ACTIVE;
+          last_touched = millis();
+        }
+      }
     }
-    else if (state->displaySaver == DISPLAY_WAKING && !M5.Touch.ispressed())
-    {
-      Serial.println("Activating");
-      state->displaySaver = DISPLAY_ACTIVE;
-      last_touched = millis();
-    }
-  }
+  
   if (millis() - last_touched  > GO_SLEEP_TIMEOUT && state->displaySaver == DISPLAY_ACTIVE )
   {
     Serial.println("Going to Sleep");
-    M5.Lcd.sleep();
-    M5.Axp.SetLDOVoltage(3, 1800);
+    M5.Display.sleep();
+    M5.Display.setBrightness(0);
     state->displaySaver = DISPLAY_SLEEPING;
   }
 
-  vTaskDelay(20);
+  vTaskDelay(50);
 }

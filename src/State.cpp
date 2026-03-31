@@ -1,4 +1,4 @@
-#include <M5Tough.h>
+#include <M5Unified.h>
 #include <Arduino.h>
 #include <string.h>
 #include <NMEA2000.h>
@@ -14,38 +14,38 @@ void tState::setupTime(time_t t)
 {
 
   struct tm *tm;
-  RTC_TimeTypeDef RTCtime;
-  RTC_DateTypeDef RTCDate;
+  m5::rtc_time_t RTCtime;
+  m5::rtc_date_t RTCDate;
 
   tm = localtime(&t);
 
-  RTCtime.Hours = tm->tm_hour;
-  RTCtime.Minutes = tm->tm_min;
-  RTCtime.Seconds = tm->tm_sec;
-  M5.Rtc.SetTime(&RTCtime);
+  RTCtime.hours = tm->tm_hour;
+  RTCtime.minutes = tm->tm_min;
+  RTCtime.seconds = tm->tm_sec;
+  M5.Rtc.setTime(RTCtime);
 
-  RTCDate.Year = tm->tm_year + 1900;
-  RTCDate.Month = tm->tm_mon + 1;
-  RTCDate.Date = tm->tm_mday;
-  M5.Rtc.SetDate(&RTCDate);
+  RTCDate.year = tm->tm_year + 1900;
+  RTCDate.month = tm->tm_mon + 1;
+  RTCDate.date = tm->tm_mday;
+  M5.Rtc.setDate(RTCDate);
   timeSet = true;
 }
 
 void tState::setupTimeSK(String datetime)
 {
-  RTC_TimeTypeDef RTCtime;
-  RTC_DateTypeDef RTCDate;
+  m5::rtc_time_t RTCtime;
+  m5::rtc_date_t RTCDate;
 
   Serial.println("Setting date time from Signal K " + datetime);
-  RTCDate.Year = atoi(datetime.substring(0, 4).c_str());
-  RTCDate.Month = atoi(datetime.substring(5, 7).c_str());
-  RTCDate.Date = atoi(datetime.substring(8, 10).c_str());
-  M5.Rtc.SetDate(&RTCDate);
+  RTCDate.year = atoi(datetime.substring(0, 4).c_str());
+  RTCDate.month = atoi(datetime.substring(5, 7).c_str());
+  RTCDate.date = atoi(datetime.substring(8, 10).c_str());
+  M5.Rtc.setDate(RTCDate);
 
-  RTCtime.Hours = atoi(datetime.substring(11, 13).c_str());
-  RTCtime.Minutes = atoi(datetime.substring(14, 16).c_str());
-  RTCtime.Seconds = atoi(datetime.substring(17, 19).c_str());
-  M5.Rtc.SetTime(&RTCtime); // writes the  time to the (RTC) real time clock.
+  RTCtime.hours = atoi(datetime.substring(11, 13).c_str());
+  RTCtime.minutes = atoi(datetime.substring(14, 16).c_str());
+  RTCtime.seconds = atoi(datetime.substring(17, 19).c_str());
+  M5.Rtc.setTime(RTCtime); // writes the  time to the (RTC) real time clock.
   timeSet = true;
 }
 /* NMEA 2000 support */
