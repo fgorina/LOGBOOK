@@ -26,5 +26,4 @@
      "clangd.fallbackFlags": [
     "-std=gnu++17"
   ]
-
 }

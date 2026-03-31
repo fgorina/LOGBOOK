@@ -51,7 +51,8 @@ void RecordScreen::draw_distance()
 {
     char buffer[MAXBUFFER];
 
-    
+  
+
     M5.Lcd.setTextSize(1.5);
     M5.Lcd.fillRect(0, height - 80, width, 80, BLACK);
     M5.Lcd.fillRect(0, 40, width/2, height, BLACK);
@@ -70,7 +71,7 @@ void RecordScreen::draw_distance()
     snprintf(buffer, MAXBUFFER, "SOG %03.1f kt", state->sog.value * 3600.0 / 1852.0);
     M5.Lcd.drawString(buffer, 19, 100);
 
-    snprintf(buffer, MAXBUFFER, u8"AWA %03.0f º", state->apparentWind.angle / PI * 180.0);
+    snprintf(buffer, MAXBUFFER, "AWA %03.0f º", state->apparentWind.angle / PI * 180.0);
     M5.Lcd.drawString(buffer, 19, 130);
 
     snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->apparentWind.speed * 3600.0 / 1852.0);

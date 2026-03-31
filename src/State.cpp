@@ -720,6 +720,19 @@ int8_t EngineTorque;
   engineTemperature.value = EngineCoolantTemp;
  
 } 
+
+/*
+  This code is general and includes engine, rudder and temperature but for the wind project
+  we only need :
+
+  PGN    Source  PGN Name
+129025   15    Position
+129026   15    COG/SOG  
+127250   15    Heading
+130306   15    Wind
+126992   15    Date/Time
+
+*/
 void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose)
 {
   this->verbose = verbose;
