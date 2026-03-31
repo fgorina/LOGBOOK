@@ -8,6 +8,9 @@
 #include "State.h"
 #include "Utilities.h"
 
+extern int sources[MAX_SOURCES];
+extern int n_sources;
+
 // Given a time_t updates the RTC
 
 void tState::setupTime(time_t t)

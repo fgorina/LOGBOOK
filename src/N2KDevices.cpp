@@ -2,6 +2,10 @@
 #include <N2kMessages.h>
 
 #include "N2KDevices.h"
+#include "Constants.h"
+
+extern int sources[MAX_SOURCES];
+extern int n_sources;
 
 N2KDevices::N2KDevices(tN2kDeviceList *deviceList, int width, int height,
                        const char *title)

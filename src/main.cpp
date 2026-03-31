@@ -108,7 +108,6 @@ bool useN2k = true;
 bool useSK = false;
 #endif
 
-#define MAX_SOURCES 20
 static String n2kSources = "15";
 int sources[MAX_SOURCES] = {15, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int n_sources = 1;
@@ -924,12 +923,12 @@ void setup()
   xTaskCreate(networkTask, "NetworkTask",4000,NULL,1,&taskNetwork);
   Serial.println("Network Task Created");
   if(useN2k){ 
-     xTaskCreate(n2KTask, "N2kTask",4000,NULL,1,&taskN2K);
+     xTaskCreate(n2KTask, "N2kTask",4000,NULL,0,&taskN2K);
      Serial.println("N2K Task Created");
   }
 
   if(useSK){
-    xTaskCreate(wssTask, "WSS Task",4000,NULL,1,&taskWss);
+    xTaskCreate(wssTask, "WSS Task",4000,NULL,0,&taskWss);
     Serial.println("WSS Task Created");
   }
  
