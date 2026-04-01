@@ -16,6 +16,7 @@
 #include "N2kDeviceList.h"
 #include <ArduinoWebsockets.h>
 #include "net_signalk.h"
+#include "net_nmea0183.h"
 
 #include "PyTypes.h"
 
@@ -99,6 +100,7 @@ static String skServer = "192.168.001.150";  //"192.168.1.54";
 int skPort = 3000;
 bool useN2k = false;
 bool useSK = true;
+bool use0183 = false;
 #else
 static String wifi_ssid = "Yamato";          //"TP-LINK_2695";//"Yamato"; //"starlink_mini";   // Store the name of the wireless network.
 static String wifi_password = "ailataN1991"; // "39338518"; //ailataN1991"; // Store the password of the wireless network.
@@ -106,6 +108,7 @@ static String skServer = "192.168.1.2";      //"192.168.1.54";
 int skPort = 3000;
 bool useN2k = true;
 bool useSK = false;
+bool use0183 = false;
 #endif
 
 static String n2kSources = "15";
@@ -146,6 +149,7 @@ String myIp = "Connecting...";
 // SignalK server
 
 NetSignalkWS *skWsServer = new NetSignalkWS(skServer.c_str(), skPort, state);
+NetNMEA0183  *nmea0183   = new NetNMEA0183(skServer.c_str(), 10110, state);
 
 // Screens
 
@@ -153,7 +157,7 @@ Screen *screens[6] = {
     new MenuScreen(state, TFT_HOR_RES, TFT_VER_RES, "Logs"),
     new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 1000),
     new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs", state),
-    new InfoScreen(wifi_ssid, &myIp, &useN2k, &useSK, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
+    new InfoScreen(wifi_ssid, &myIp, &useN2k, &useSK, &use0183, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
     new N2KDevices(pN2kDeviceList, TFT_HOR_RES,  TFT_VER_RES, "N2k"),
     nullptr,
 };
@@ -172,6 +176,7 @@ void writePreferences()
   preferences.remove("FILEFORMAT");
   preferences.remove("USEN2K");
   preferences.remove("USESK");
+  preferences.remove("USE0183");
 
   preferences.putString("SSID", wifi_ssid);
   preferences.putString("PASSWD", wifi_password);
@@ -180,6 +185,7 @@ void writePreferences()
   preferences.putBool("FILEFORMAT", ((RecordScreen *)screens[1])->xmlFormat);
   preferences.putBool("USEN2K", useN2k);
   preferences.putBool("USESK", useSK);
+  preferences.putBool("USE0183", use0183);
   n2kSources = join(sources, MAX_SOURCES, ',');
   preferences.putString("N2KSOURCES", n2kSources);
   preferences.end();
@@ -194,8 +200,9 @@ void readPreferences()
   skPort = preferences.getInt("PPPORT", skPort);
   ((RecordScreen *)screens[1])->xmlFormat = preferences.getBool("FILEFORMAT", false);
 
-  useN2k = preferences.getBool("USEN2K", false);
-  useSK = preferences.getBool("USESK", false);
+  useN2k  = preferences.getBool("USEN2K",  false);
+  useSK   = preferences.getBool("USESK",   false);
+  use0183 = preferences.getBool("USE0183", false);
   
 
   n2kSources = preferences.getString("N2KSOURCES", n2kSources);
@@ -220,6 +227,8 @@ void readPreferences()
   Serial.println(useN2k);
   Serial.print("use SignalK : ");
   Serial.println(useSK);
+  Serial.print("use NMEA0183: ");
+  Serial.println(use0183);
   Serial.print("Sources : ");
   for(int i = 0; i < MAX_SOURCES; i++){
     if (sources[i] >= 0){
@@ -360,7 +369,8 @@ void handleFileList()
 
   File root = SD.open("/");
 
-  String output = "<htlm><head><title>Logs</title></head><body>\n";
+  String output = "<htlm><head><title>Logs</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>\n";
+
   output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Logs</h1>\n";
   output += "<a href=\"" + getFullUri("ask") + "\">Esborrar tots els Logs</a></br>";
   output += "<ul>\n";
@@ -388,7 +398,11 @@ void handleFileList()
 void handleMenu()
 {
   Serial.println("handleMenu");
-  String output = "<html><head><title>Logbook by Paco Gorina</title></head><body>";
+  String output = "<html><head>"
+                  "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                  "<title>Logbook by Paco Gorina</title>"
+                  "</head><body>";
+
   output += "<h1>Logbook by Paco Gorina</h1>";
   output += "<ul>";
   output += "<li><a href=\"" + getFullUri("prefs") + "\">Prefer&egrave;ncies</a></li>";
@@ -404,7 +418,7 @@ void handleMenu()
 void handleAskForDelete()
 {
   Serial.println("handleAskForDelete");
-  String output = "<html><head><title>Confirmeu, si us plau</title></head><body>";
+  String output = "<html><head><title>Confirmeu, si us plau</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>";
   output += "Segur que voleu esborrar tots els logs? <a href=" + getFullUri("clear") + ">Si</a> <a href=" + getFullUri("logs") + ">No</a>";
   unsigned long len = output.length();
   server.sendHeader("Content-Length", String(len));
@@ -416,7 +430,7 @@ void handleDeleteAll()
 
   File root = SD.open("/");
 
-  String output = "<htlm><head><meta http-equiv=\"refresh\" content=\"0;url=/\"><title>Logs</title></head><body>\n";
+  String output = "<htlm><head><meta http-equiv=\"refresh\" content=\"0;url=/\"><title>Logs</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>\n";
   output += "<h1>Logs</h1>\n";
   output += "<ul>\n";
   if (root.isDirectory())
@@ -450,7 +464,7 @@ void handlePreferences()
 {
   Serial.println("handlePreferences");
   n2kSources = join(sources, MAX_SOURCES, ',');
-  String output = "<html><head><title>Prefer&egrave;ncies</title></head><body>";
+  String output = "<html><head><title>Prefer&egrave;ncies</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>";
   output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Prefer&egrave;ncies</h1>";
   output += "<form action=\"" + getFullUri("updatePrefs") + "\" method=\"post\">";
   output += "<table border=0>";
@@ -462,6 +476,7 @@ void handlePreferences()
   output += "<tr><td><label for=\"usen2k\">Use N2k:</label></td><td><input type=\"checkbox\" id=\"usen2k\" name=\"usen2k\" value=\"on\" " + String(useN2k ? "checked" : "") + "></td></tr>";
   output += "<tr><td><label for=\"n2kdevices\">N2K Devices:</label></td><td><input type=\"text\" id=\"n2kdevices\" name=\"n2kdevices\" value=\"" + n2kSources + "\"></td></tr>";
   output += "<tr><td><label for=\"usesk\">Use SignalK:</label></td><td><input type=\"checkbox\" id=\"usesk\" name=\"usesk\" value=\"on\" " + String(useSK ? "checked" : "") + "></td></tr>";
+  output += "<tr><td><label for=\"use0183\">Use NMEA 0183:</label></td><td><input type=\"checkbox\" id=\"use0183\" name=\"use0183\" value=\"on\" " + String(use0183 ? "checked" : "") + "></td></tr>";
   output += "<tr><td colspan=2 align=center><input type=\"submit\" value=\"Submit\"></td></tr>";
   output += "</table>";
   output += "</form>";
@@ -517,6 +532,7 @@ void handleUpdatePreferences()
   {
     useSK = false;
   }
+  use0183 = server.hasArg("use0183");
   if (server.hasArg("n2kdevices")){
     n2kSources = server.arg("n2kdevices");
     n_sources = splitter((char*) (n2kSources.c_str()), sources, ',', n2kSources.length(), MAX_SOURCES);
@@ -757,6 +773,7 @@ void switchTo(int i)
 TaskHandle_t taskNetwork;
 TaskHandle_t taskN2K;
 TaskHandle_t taskWss;
+TaskHandle_t task0183;
 
 void networkTask(void *parameter)
 {
@@ -791,14 +808,25 @@ void n2KTask(void *parameter)
 
 void wssTask(void *parameter)
 {
-
   while (true)
-  {   
+  {
     if (useSK && checkConnection())
     {
       skWsServer->run();
     }
     vTaskDelay(10);
+  }
+}
+
+void nmea0183Task(void *parameter)
+{
+  while (true)
+  {
+    if (use0183 && checkConnection())
+    {
+      nmea0183->run();
+    }
+    vTaskDelay(20);
   }
 }
 void uiTask(const m5::touch_detail_t &t)
@@ -910,7 +938,13 @@ void setup()
 
   M5.Display.setFont(&fonts::FreeSans12pt7b);
   M5.Display.setTextSize(1.0);
-  SD.begin();
+  // Core2: SD uses VSPI, CS=GPIO4, CLK=GPIO18, MISO=GPIO38, MOSI=GPIO23
+  SPI.begin(18, 38, 23, 4);
+  if (!SD.begin(4, SPI, 25000000)) {
+    Serial.println("SD card mount failed");
+  } else {
+    Serial.println("SD card mounted");
+  }
 
   if (useN2k)
   {
@@ -930,6 +964,11 @@ void setup()
   if(useSK){
     xTaskCreate(wssTask, "WSS Task",4000,NULL,0,&taskWss);
     Serial.println("WSS Task Created");
+  }
+
+  if(use0183){
+    xTaskCreate(nmea0183Task, "NMEA0183 Task",4000,NULL,0,&task0183);
+    Serial.println("NMEA0183 Task Created");
   }
  
   // currentScreen = new MenuScreen(TFT_HOR_RES, TFT_VER_RES, "Logs");

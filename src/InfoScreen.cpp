@@ -1,11 +1,12 @@
 #include "InfoScreen.h"
 
-InfoScreen::InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, String* skServer, int* skPort,  String* sources,  int width, int height, const char *title):Screen (width, height, title)
+InfoScreen::InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, bool* use0183, String* skServer, int* skPort,  String* sources,  int width, int height, const char *title):Screen (width, height, title)
 {
     this->ssid = ssid;
     this->ip = ip;
     this->useN2k = useN2k;
     this->useSK = useSK;
+    this->use0183 = use0183;
     this->skServer = skServer;
     this->skPort = skPort;
     this->sources = sources;
@@ -62,8 +63,9 @@ void InfoScreen::draw()
     M5.Display.drawString("SSID: " + ssid , 10, pos+=delta);
 
     M5.Display.drawString("IP: " + *ip , 10, pos+=delta);
-    M5.Display.drawString("N2K " + String(*useN2k ? "Si" : "No") + "     SK " + String(*useSK ? "Si" : "No") , 10, pos+=delta);
+    M5.Display.drawString("N2K " + String(*useN2k ? "Si" : "No") + "  SK " + String(*useSK ? "Si" : "No") + "  0183 " + String(*use0183 ? "Si" : "No"), 10, pos+=delta);
     M5.Display.drawString("(" + *sources + ")" , 10, pos+=delta);
+    
     M5.Display.drawString("SK " + *skServer + " :" + *skPort, 10, pos+=delta);
 
     M5.Display.setTextDatum(CC_DATUM);

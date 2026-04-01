@@ -10,7 +10,7 @@
 class InfoScreen : public Screen
 {
 public:
-    InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, String* skServer, int* skPort,  String* sources, int width, int height, const char *title);
+    InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, bool* use0183, String* skServer, int* skPort,  String* sources, int width, int height, const char *title);
 
     void enter() override;
     void exit() override;
@@ -27,6 +27,7 @@ protected:
 
     bool* useN2k;
     bool* useSK;
+    bool* use0183;
     String* skServer;
     int* skPort;
     String* sources;

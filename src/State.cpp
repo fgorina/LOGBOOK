@@ -997,594 +997,217 @@ void tState::saveGPXFooter(File f)
 
 bool tState::signalk_parse_ws(String msg)
 {
-  bool found = false;
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, msg);
-  // Parse succeeded?
-
-  if (err)
-  {
-    Serial.println("Error decoding message");
-    Serial.println(msg);
+  if (deserializeJson(doc, msg)) {
+    Serial.println("SK: JSON parse error");
     return false;
   }
 
-  JsonObject obj = doc.as<JsonObject>();
+  JsonArray updates = doc["updates"];
+  if (updates.isNull() || updates.size() == 0) return false;
 
-  if (obj != NULL)
-  {
-    found = parseObj(obj);
-  }
-  return found;
-}
-
-bool tState::parseObj(JsonObject obj)
-{
   bool found = false;
-  JsonArray updates = obj["updates"];
-  if (updates != NULL)
-  {
-    for (size_t i_u = 0; i_u < updates.size(); i_u++)
-    {
-      JsonObject update = updates[i_u];
-      if (update != NULL)
-      {
-        JsonArray values = update["values"];
-        if (values != NULL)
-        {
-          for (size_t i_v = 0; i_v < values.size(); i_v++)
-          {
-            JsonObject valueObj = values[i_v];
-            if (valueObj != NULL)
-            {
-              if (valueObj["path"].is<const char *>())
-              {
-                String path = valueObj["path"].as<const char *>();
-                if (path != NULL)
-                {
+  for (JsonObjectConst update : updates) {
+    const char *timestamp = update["timestamp"] | "";
+    if (timestamp[0] && !timeSet) {
+      setupTimeSK(String(timestamp));
+    }
 
-                  JsonVariant value = valueObj["value"];
-                  // Serial.print("Value "); Serial.println(value.as<int>());
-                  //  PACO Removed the test of NULL becasuse when value == 0 (an integer) fails!!!
-                  // if (value != NULL) {
-                  update_value(path, i_u, i_v, value);
-                  found = true;
-                  // }
-                }
-              }
-            }
-          }
-        }
+    for (JsonObjectConst v : update["values"].as<JsonArrayConst>()) {
+      const char *path = v["path"] | "";
+      if (path[0]) {
+        onSignalKDelta(path, v["value"]);
+        found = true;
       }
     }
   }
   return found;
 }
 
-// Once parsed the JSON we store the values following the path
-
-void tState::update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVariant &value)
+void tState::onSignalKDelta(const char *path, JsonVariantConst value)
 {
   time_t now = time(nullptr);
 
-  const char *p = path.c_str();
-  if (starts_with(p, "navigation."))
-  {
-
-    const char *t = step_into_token(p);
-    if (strcmp(t, "rateOfTurn") == 0)
-    {
-      if (value.is<float>())
-      {
-        rateOfTurn.origin = -1;
-        rateOfTurn.when = now;
-        rateOfTurn.value = value.as<float>();
-      }
-    }
-    else if (strcmp(t, "headingMagnetic") == 0)
-    {
-      if (value.is<float>())
-      {
-
-        magneticHeading.origin = -1;
-        magneticHeading.when = now;
-        magneticHeading.reference = tN2kHeadingReference::N2khr_magnetic;
-        magneticHeading.heading = value.as<float>();
-      }
-    }
-    else if (strcmp(t, "headingTrue") == 0)
-    {
-      if (value.is<float>())
-      {
-        trueHeading.origin = -1;
-        trueHeading.when = now;
-        trueHeading.reference = tN2kHeadingReference::N2khr_true;
-        trueHeading.heading = value.as<float>();
-      }
-    }
-    else if (strcmp(t, "position") == 0)
-    {
-
-      if (value["longitude"].is<float>() && value["latitude"].is<float>())
-      {
-        position.when = now;
-        position.origin = -1;
-        position.latitude = value["latitude"].as<float>();
-        position.longitude = value["longitude"].as<float>();
-      }
-    }
-    else if (strcmp(t, "speedOverGround") == 0)
-    {
-      if (value.is<float>())
-      {
-        sog.when = now;
-        sog.origin = -1;
-        sog.value = value.as<float>();
-      }
-    }
-    else if (strcmp(t, "speedThroughWater") == 0)
-    {
-      if (value.is<float>())
-      {
-        stw.when = now;
-        stw.origin = -1;
-        stw.value = value.as<float>();
-      }
-    }
-    else if (strcmp(t, "courseOverGroundTrue") == 0)
-    {
-      if (value.is<float>())
-      {
-        cog.when = now;
-        cog.origin = -1;
-        cog.heading = value.as<float>();
-        cog.reference = tN2kHeadingReference::N2khr_true;
-      }
-    }
-
-    /*
-    else if (strcmp(t, "courseRhumbline.crossTrackError") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.navigation.course_rhumbline.cross_track_error.m = value.as<float>();
-        shipDataModel.navigation.course_rhumbline.cross_track_error.age = millis();
-      }
-    }
-    else if (strcmp(t, "courseRhumbline.bearingTrackTrue") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.navigation.course_rhumbline.bearing_track_true.deg = value.as<float>() * 180.0 / PI;
-        shipDataModel.navigation.course_rhumbline.bearing_track_true.age = millis();
-      }
-    }
-    else if (strcmp(t, "courseRhumbline.nextPoint.distance") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.navigation.course_rhumbline.next_point.distance.m = value.as<float>();
-        shipDataModel.navigation.course_rhumbline.next_point.distance.age = millis();
-      }
-    }
-    else if (strcmp(t, "courseRhumbline.nextPoint.velocityMadeGood") == 0)
-    {
-      if (value.is<float>())
-      {
-        shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.kn = value.as<float>() / _GPS_MPS_PER_KNOT;
-        shipDataModel.navigation.course_rhumbline.next_point.velocity_made_good.age = millis();
-      }
-    }
-    else if (strcmp(t, "state") == 0)
-    {
-      if (value.is<String>())
-      {
-        String val = value.as<String>();
-        if (val != NULL)
-        {
-          set_vessel_nav_state(val);
-        }
-      }
-    }
-      */
-    else if (strcmp(t, "attitude") == 0)
-    {
-
-      // PACO Add pitch and roll from signalk
-
-      if (value["pitch"].is<float>() && value["roll"].is<float>())
-      {
-        attitude.when = now;
-        attitude.origin = -1;
-        attitude.pitch = value["pitch"].as<float>();
-        attitude.roll = value["roll"].as<float>();
-      }
-    }
-
-    // Change so rtc time is initialized to UTC from GPS. Should be quite exact
-    else if (strcmp(t, "datetime") == 0)
-
-    {
-      if (value.is<String>())
-      {
-        String val = value.as<String>();
-        if (val != NULL && !timeSet)
-        {
-          setupTimeSK(val);
-        }
-      }
+  // --- navigation ---
+  if (strcmp(path, "navigation.rateOfTurn") == 0) {
+    if (value.is<float>()) {
+      rateOfTurn = {now, -1, value.as<float>()};
     }
   }
-  else if (starts_with(p, "environment."))
-  {
-
-    const char *t = step_into_token(p);
-    if (starts_with(t, "wind."))
-    {
-      const char *w = step_into_token(t);
-      if (strcmp(w, "angleApparent") == 0)
-      {
-
-        if (value.is<float>())
-        {
-          apparentWind.when = now;
-          apparentWind.origin = -1;
-          apparentWind.angle = value.as<float>();
-          apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
-        }
-      }
-      else if (strcmp(w, "angleTrueGround") == 0)
-      {
-        if (value.is<float>())
-        {
-          trueWind.when = now;
-          trueWind.origin = -1;
-          trueWind.angle = value.as<float>();
-          trueWind.reference = tN2kWindReference::N2kWind_True_North;
-        }
-      }
-      else if (strcmp(w, "directionTrue") == 0)
-      {
-        if (value.is<float>())
-        {
-          trueWind.when = now;
-          trueWind.origin = -1;
-          trueWind.angle = value.as<float>();
-          trueWind.reference = tN2kWindReference::N2kWind_True_North;
-        }
-      }
-      /* else if (strcmp(w, "angleTrueWater") == 0)
-      {
-        if (value.is<float>())
-        {
-          shipDataModel.environment.wind.true_wind_angle.deg = value.as<float>() * 180.0 / PI;
-          shipDataModel.environment.wind.true_wind_angle.age = millis();
-        }
-      } */
-      else if (strcmp(w, "speedApparent") == 0)
-      {
-        if (value.is<float>())
-        {
-          apparentWind.when = now;
-          apparentWind.origin = -1;
-          apparentWind.speed = value.as<float>();
-          apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
-        }
-      }
-      else if (strcmp(w, "speedOverGround") == 0)
-      {
-        if (value.is<float>())
-        {
-          trueWind.when = now;
-          trueWind.origin = -1;
-          trueWind.speed = value.as<float>();
-          trueWind.reference = tN2kWindReference::N2kWind_True_North;
-        }
-      }
-      else if (strcmp(w, "speedTrue") == 0)
-      {
-        if (value.is<float>())
-        {
-          trueWind.when = now;
-          trueWind.origin = -1;
-          trueWind.speed = value.as<float>();
-          trueWind.reference = tN2kWindReference::N2kWind_True_North;
-        }
-      }
-    }
-    else if (starts_with(t, "depth."))
-    {
-      const char *d = step_into_token(t);
-      if (strcmp(d, "belowKeel") == 0)
-      {
-        if (value.is<float>())
-        {
-          depth.when = now;
-          depth.origin = -1;
-          depth.value = value.as<float>();
-        }
-      }
-      else if (strcmp(d, "belowTransducer") == 0)
-      {
-        if (value.is<float>())
-        {
-          depth.when = now;
-          depth.origin = -1;
-          depth.value = value.as<float>();
-        }
-      }
-      else if (strcmp(d, "belowSurface") == 0)
-      {
-        if (value.is<float>())
-        {
-          depth.when = now;
-          depth.origin = -1;
-          depth.value = value.as<float>();
-        }
-      }
+  else if (strcmp(path, "navigation.headingMagnetic") == 0) {
+    if (value.is<float>()) {
+      magneticHeading.when = now; magneticHeading.origin = -1;
+      magneticHeading.reference = tN2kHeadingReference::N2khr_magnetic;
+      magneticHeading.heading = value.as<float>();
     }
   }
-
-  else if (starts_with(p, "steering."))
-  {
-    const char *t = step_into_token(p);
-    if (strcmp(t, "rudderAngle") == 0)
-    {
-      if (value.is<float>())
-      {
-        rudderAngle.when = now;
-        rudderAngle.origin = -1;
-        rudderAngle.value = value.as<float>();
-      }
+  else if (strcmp(path, "navigation.headingTrue") == 0) {
+    if (value.is<float>()) {
+      trueHeading.when = now; trueHeading.origin = -1;
+      trueHeading.reference = tN2kHeadingReference::N2khr_true;
+      trueHeading.heading = value.as<float>();
     }
   }
-  else if (starts_with(p, "propulsion."))
-  {
-    String engineID = path.substring(11);
-    int idx = engineID.indexOf('.');
-    if (idx > 0)
-    {
-      engineID = engineID.substring(0, idx);
-      if (engineID != NULL)
-      {
-        // engine_t *eng = lookup_engine(engineID.c_str());
-        // if (eng != NULL)
-        //{
-        String prefix = String("propulsion.") + engineID;
-
-        if (path == (prefix + ".revolutions"))
-        {
-          if (value.is<float>())
-          {
-            rpm.when = now;
-            rpm.origin = -1;
-            rpm.value = value.as<float>();
-          }
-        }
-        else if (path == (prefix + ".temperature"))
-        {
-          if (value.is<float>())
-          {
-            engineTemperature.when = now;
-            engineTemperature.origin = -1;
-            engineTemperature.value = value.as<float>();
-          }
-        }
-        else if (path == (prefix + ".oilPressure"))
-        {
-          if (value.is<float>())
-          {
-            oilPressure.when = now;
-            oilPressure.origin = -1;
-            oilPressure.value = value.as<float>();
-          }
-        }
-      }
+  else if (strcmp(path, "navigation.position") == 0) {
+    if (value["latitude"].is<float>() && value["longitude"].is<float>()) {
+      position.when = now; position.origin = -1;
+      position.latitude  = value["latitude"].as<float>();
+      position.longitude = value["longitude"].as<float>();
     }
   }
-};
-
-/*
-    else if (strcmp(t, "lights.navigation.state") == 0)
-    {
-
-      if (value.as<int>() == 0)
-      {
-        shipDataModel.navigation.lights.bow_red_green.state.st = on_off_e::OFF;
-      }
-      else
-      {
-        shipDataModel.navigation.lights.bow_red_green.state.st = ON;
-      }
-      shipDataModel.navigation.lights.bow_red_green.state.age = millis();
+  else if (strcmp(path, "navigation.speedOverGround") == 0) {
+    if (value.is<float>()) { sog = {now, -1, value.as<float>()}; }
+  }
+  else if (strcmp(path, "navigation.speedThroughWater") == 0) {
+    if (value.is<float>()) { stw = {now, -1, value.as<float>()}; }
+  }
+  else if (strcmp(path, "navigation.courseOverGroundTrue") == 0) {
+    if (value.is<float>()) {
+      cog.when = now; cog.origin = -1;
+      cog.reference = tN2kHeadingReference::N2khr_true;
+      cog.heading = value.as<float>();
     }
-    else if (strcmp(t, "lights.anchor.state") == 0)
-    {
-      if (value.as<int>() == 0)
-      {
-        shipDataModel.navigation.lights.anchor.state.st = on_off_e::OFF;
-      }
-      else
-      {
-        shipDataModel.navigation.lights.anchor.state.st = ON;
-      }
-      shipDataModel.navigation.lights.anchor.state.age = millis();
+  }
+  else if (strcmp(path, "navigation.attitude") == 0) {
+    if (value["pitch"].is<float>() && value["roll"].is<float>()) {
+      attitude.when = now; attitude.origin = -1;
+      attitude.pitch = value["pitch"].as<float>();
+      attitude.roll  = value["roll"].as<float>();
     }
-    else if (strcmp(t, "lights.motoring.state") == 0)
-    {
-      if (value.as<int>() == 0)
-      {
-        shipDataModel.navigation.lights.motoring.state.st = on_off_e::OFF;
-      }
-      else
-      {
-        shipDataModel.navigation.lights.motoring.state.st = ON;
-      }
-      shipDataModel.navigation.lights.motoring.state.age = millis();
+  }
+  // --- environment.wind ---
+  else if (strcmp(path, "environment.wind.angleApparent") == 0) {
+    if (value.is<float>()) {
+      apparentWind.when = now; apparentWind.origin = -1;
+      apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
+      apparentWind.angle = value.as<float>();
     }
-    else if (strcmp(t, "lights.deck.state") == 0)
-    {
-      if (value.as<int>() == 0)
-      {
-        shipDataModel.navigation.lights.deck.state.st = on_off_e::OFF;
-      }
-      else
-      {
-        shipDataModel.navigation.lights.deck.state.st = ON;
-      }
-      shipDataModel.navigation.lights.deck.state.age = millis();
+  }
+  else if (strcmp(path, "environment.wind.angleTrueGround") == 0 ||
+           strcmp(path, "environment.wind.directionTrue") == 0) {
+    if (value.is<float>()) {
+      trueWind.when = now; trueWind.origin = -1;
+      trueWind.reference = tN2kWindReference::N2kWind_True_North;
+      trueWind.angle = value.as<float>();
     }
-    else if (strcmp(t, "lights.instruments.state") == 0)
-    {
-      if (value.as<int>() == 0)
-      {
-        shipDataModel.navigation.lights.instruments.state.st = on_off_e::OFF;
-      }
-      else
-      {
-        shipDataModel.navigation.lights.instruments.state.st = ON;
-      }
-      shipDataModel.navigation.lights.instruments.state.age = millis();
+  }
+  else if (strcmp(path, "environment.wind.speedApparent") == 0) {
+    if (value.is<float>()) {
+      apparentWind.when = now; apparentWind.origin = -1;
+      apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
+      apparentWind.speed = value.as<float>();
     }
-      }
-      */
-
-/*
-else if (starts_with(p, "tanks."))
-{
-String tankType;
-int idTankType;
-int idx;
-String attr;
-
-char *pch;
-pch = strtok((char *)p, ".");
-if (pch != NULL)
-{
-  pch = strtok(NULL, ".");
-  if (pch != NULL)
-  {
-    tankType = String(pch);
-    pch = strtok(NULL, ".");
-    if (pch != NULL)
-    {
-      idx = atoi(pch) - 1;
-      pch = strtok(NULL, ".");
-      if (pch != NULL)
-      {
-        attr = String(pch);
+  }
+  else if (strcmp(path, "environment.wind.speedOverGround") == 0 ||
+           strcmp(path, "environment.wind.speedTrue") == 0) {
+    if (value.is<float>()) {
+      trueWind.when = now; trueWind.origin = -1;
+      trueWind.reference = tN2kWindReference::N2kWind_True_North;
+      trueWind.speed = value.as<float>();
+    }
+  }
+  // --- environment.depth ---
+  else if (strcmp(path, "environment.depth.belowKeel") == 0 ||
+           strcmp(path, "environment.depth.belowTransducer") == 0 ||
+           strcmp(path, "environment.depth.belowSurface") == 0) {
+    if (value.is<float>()) { depth = {now, -1, value.as<float>()}; }
+  }
+  // --- steering ---
+  else if (strcmp(path, "steering.rudderAngle") == 0) {
+    if (value.is<float>()) { rudderAngle = {now, -1, value.as<float>()}; }
+  }
+  // --- propulsion (engine ID is dynamic: propulsion.<id>.field) ---
+  else if (starts_with(path, "propulsion.")) {
+    const char *after = path + 11;          // skip "propulsion."
+    const char *dot = strchr(after, '.');   // find end of engine ID
+    if (dot) {
+      const char *field = dot + 1;
+      if (strcmp(field, "revolutions") == 0 && value.is<float>()) {
+        rpm = {now, -1, value.as<float>()};
+      } else if (strcmp(field, "temperature") == 0 && value.is<float>()) {
+        engineTemperature = {now, -1, value.as<float>()};
+      } else if (strcmp(field, "oilPressure") == 0 && value.is<float>()) {
+        oilPressure = {now, -1, value.as<float>()};
       }
     }
   }
 }
 
-if (tankType == "freshWater")
+// NMEA 0183 over WiFi
+
+void tState::onNMEA0183Wind(float angleRad, float speedMs, bool apparent)
 {
-  idTankType = FRESH_WATER;
-}
-else if (tankType == "fuel")
-{
-  idTankType = FUEL;
-}
-else if (tankType == "wasteWater")
-{
-  idTankType = WASTE_WATER;
-}
-else if (tankType == "blackWater")
-{
-  idTankType = BLACK_WATER;
-}
-else
-{
-  idTankType = FLUID_TYPE_NA;
+  time_t now = time(nullptr);
+  if (apparent) {
+    apparentWind.when = now; apparentWind.origin = -1;
+    apparentWind.reference = tN2kWindReference::N2kWind_Apparent;
+    if (!isnan(angleRad)) apparentWind.angle = angleRad;
+    if (!isnan(speedMs))  apparentWind.speed = speedMs;
+  } else {
+    trueWind.when = now; trueWind.origin = -1;
+    trueWind.reference = tN2kWindReference::N2kWind_True_North;
+    if (!isnan(angleRad)) trueWind.angle = angleRad;
+    if (!isnan(speedMs))  trueWind.speed = speedMs;
+  }
 }
 
-if (idx < MAX_TANKS && idx >= 0)
+void tState::onNMEA0183Position(float lat, float lon)
 {
-  if (attr == "currentLevel")
-  {
-    shipDataModel.tanks.tank[idx].percent_of_full.pct = value.as<float>() * 100.0;
-    shipDataModel.tanks.tank[idx].percent_of_full.age = millis();
-    shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
-  }
-  else if (attr == "capacity")
-  {
-    shipDataModel.tanks.tank[idx].volume.L = value.as<float>() * 1000.0;
-    shipDataModel.tanks.tank[idx].volume.age = millis();
-    shipDataModel.tanks.tank[idx].fluid_type = (fluid_type_e)idTankType;
-  }
-}
-Serial.print("Tank ");
-Serial.print(tankType);
-Serial.print(" Index ");
-Serial.print(idx);
-Serial.print(" Attr ");
-Serial.print(attr);
-Serial.print(" Value ");
-Serial.println(value.as<String>());
-}
-/*else if (starts_with(p, "electrical.lights."))
-{
-
-if (strcmp(p, "electrical.lights.1.compass.state") == 0)
-{
-  float f = value.as<float>();
-  shipDataModel.navigation.lights.compass.intensity = f;
-  shipDataModel.navigation.lights.compass.age = millis();
-  Serial.print("Receiving compass light data ");
-  Serial.println(f);
-}
+  if (isnan(lat) || isnan(lon)) return;
+  time_t now = time(nullptr);
+  position.when = now; position.origin = -1;
+  position.latitude  = lat;
+  position.longitude = lon;
 }
 
-/*
-      else if (path == (prefix + ".alternatorVoltage"))
-      {
-        if (value.is<float>())
-        {
-          eng->alternator_voltage.volt = value.as<float>();
-          eng->alternator_voltage.age = millis();
-        }
-      }
-
-       /*
-else if (starts_with(t, "outside."))
+void tState::onNMEA0183SOGCOGTrue(float sogMs, float cogRad)
 {
-  const char *o = step_into_token(t);
-  if (strcmp(o, "pressure") == 0)
-  {
-    if (value.is<float>())
-    {
-      shipDataModel.environment.air_outside.pressure.hPa = value.as<float>() / 100.0;
-      shipDataModel.environment.air_outside.pressure.age = millis();
-    }
+  time_t now = time(nullptr);
+  if (!isnan(sogMs)) { sog.when = now; sog.origin = -1; sog.value = sogMs; }
+  if (!isnan(cogRad)) {
+    cog.when = now; cog.origin = -1;
+    cog.reference = tN2kHeadingReference::N2khr_true;
+    cog.heading = cogRad;
   }
-  else if (strcmp(o, "humidity") == 0)
-  {
-    if (value.is<float>())
-    {
-      shipDataModel.environment.air_outside.humidity_pct.pct = value.as<float>() * 100.0;
-      shipDataModel.environment.air_outside.humidity_pct.age = millis();
-    }
-  }
-  else if (strcmp(o, "temperature") == 0)
-  {
-    if (value.is<float>())
-    {
-      shipDataModel.environment.air_outside.temp_deg_C.deg_C = value.as<float>() - 273.15;
-      shipDataModel.environment.air_outside.temp_deg_C.age = millis();
-    }
-  }
-  else if (strcmp(o, "illuminance") == 0)
-  {
-    if (value.is<float>())
-    {
-      shipDataModel.environment.air_outside.illuminance.lux = value.as<float>();
-      shipDataModel.environment.air_outside.illuminance.age = millis();
-    }
-  }
-}
 }
 
-*/
+void tState::onNMEA0183HeadingMagnetic(float hdgRad)
+{
+  if (isnan(hdgRad)) return;
+  time_t now = time(nullptr);
+  magneticHeading.when = now; magneticHeading.origin = -1;
+  magneticHeading.reference = tN2kHeadingReference::N2khr_magnetic;
+  magneticHeading.heading = hdgRad;
+}
+
+void tState::onNMEA0183HeadingTrue(float hdgRad)
+{
+  if (isnan(hdgRad)) return;
+  time_t now = time(nullptr);
+  trueHeading.when = now; trueHeading.origin = -1;
+  trueHeading.reference = tN2kHeadingReference::N2khr_true;
+  trueHeading.heading = hdgRad;
+}
+
+// hhmmss = "hhmmss.ss", ddmmyy = "ddmmyy"
+void tState::onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy)
+{
+  if (timeSet) return;
+  if (!hhmmss || !ddmmyy || strlen(hhmmss) < 6 || strlen(ddmmyy) < 6) return;
+
+  m5::rtc_time_t t;
+  t.hours   = (hhmmss[0]-'0')*10 + (hhmmss[1]-'0');
+  t.minutes = (hhmmss[2]-'0')*10 + (hhmmss[3]-'0');
+  t.seconds = (hhmmss[4]-'0')*10 + (hhmmss[5]-'0');
+  M5.Rtc.setTime(t);
+
+  m5::rtc_date_t d;
+  d.date  = (ddmmyy[0]-'0')*10 + (ddmmyy[1]-'0');
+  d.month = (ddmmyy[2]-'0')*10 + (ddmmyy[3]-'0');
+  d.year  = 2000 + (ddmmyy[4]-'0')*10 + (ddmmyy[5]-'0');
+  M5.Rtc.setDate(d);
+  timeSet = true;
+  Serial.println("NMEA0183: RTC set from GPS");
+}
 
 /* Signal K Parsing */

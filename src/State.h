@@ -47,10 +47,16 @@ protected:
                                    tN2kNavigationDirection &NavDirection, char *RouteName, size_t RouteNameBufSize, tN2kGenericStatusPair &SupplementaryData,
                                    uint16_t wptArraySize, t_waypoint *waypoints);
 
-    bool parseObj(JsonObject obj);
-    void update_value(String &path, size_t &u_idx, size_t &v_idx, JsonVariant &value);
-    
+    void onSignalKDelta(const char *path, JsonVariantConst value);
+
 public:
+    // NMEA 0183 over WiFi
+    void onNMEA0183Wind(float angleRad, float speedMs, bool apparent);
+    void onNMEA0183Position(float lat, float lon);
+    void onNMEA0183SOGCOGTrue(float sogMs, float cogRad);
+    void onNMEA0183HeadingMagnetic(float hdgRad);
+    void onNMEA0183HeadingTrue(float hdgRad);
+    void onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy);
     int displaySaver = DISPLAY_ACTIVE;
 
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};

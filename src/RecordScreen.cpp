@@ -64,13 +64,13 @@ void RecordScreen::draw_distance()
     // Now Show COG i SOG
 
     M5.Display.setTextDatum(ML_DATUM);
-    snprintf(buffer, MAXBUFFER, "COG %03.0f º", state->cog.heading/PI*180.0);
+    snprintf(buffer, MAXBUFFER, "COG %03.0f º", round(state->cog.heading/PI*180.0));
     M5.Display.drawString(buffer, 19, 75);
 
     snprintf(buffer, MAXBUFFER, "SOG %03.1f kt", state->sog.value * 3600.0 / 1852.0);
     M5.Display.drawString(buffer, 19, 100);
 
-    snprintf(buffer, MAXBUFFER, "AWA %03.0f º", state->apparentWind.angle / PI * 180.0);
+    snprintf(buffer, MAXBUFFER, "AWA %03.0f º", round(state->apparentWind.angle / PI * 180.0));
     M5.Display.drawString(buffer, 19, 130);
 
     snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->apparentWind.speed * 3600.0 / 1852.0);
