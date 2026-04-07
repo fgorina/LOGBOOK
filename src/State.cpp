@@ -118,7 +118,7 @@ void tState::handleSystemDateTime(const tN2kMsg &N2kMsg)
 
   // Compute the tiome since epoch
 
-  time_t now = SystemTime + (SystemDate * 68400);
+  time_t now = SystemTime + (SystemDate * 86400);
   setupTime(now);
 }
 

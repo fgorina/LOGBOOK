@@ -586,10 +586,10 @@ void startWebServer()
                       {
                         deleteFile(server.uri());
                       }
-                     
-    else if (!handleFileRead(server.uri())) {
-      server.send(404, "text/plain", "FileNotFound");
-    } });
+                      else if (!handleFileRead(server.uri()))
+                      {
+                        server.send(404, "text/plain", "FileNotFound");
+                      } });
 
   server.begin();
   Serial.println("HTTP server started");
@@ -637,16 +637,8 @@ boolean startWiFi()
     Serial.println(WiFi.localIP());
     myIp = WiFi.localIP().toString();
 
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo) || timeinfo.tm_year < 20)
-    {
-      configTime(0, 0, "europe.pool.ntp.org");
-      Serial.println("Synced RTC from NTP");
-    }
-    else
-    {
-      Serial.println("RTC already synced");
-    }
+    configTime(0, 0, "europe.pool.ntp.org");
+    Serial.println("Syncing RTC from NTP");
     vTaskDelay(5);
     // Start mdns so we have a name
 
@@ -923,7 +915,7 @@ void setup()
 {
 
   M5.begin();
-  M5.Display.setRotation(1);
+  M5.Display.setRotation(1); // 3 per la versio NMESA 2000
   Serial.begin(115200);
   M5.Display.wakeup();
   readPreferences();
