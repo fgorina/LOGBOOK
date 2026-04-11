@@ -639,7 +639,18 @@ boolean startWiFi()
 
     configTime(0, 0, "europe.pool.ntp.org");
     Serial.println("Syncing RTC from NTP");
-    vTaskDelay(5);
+    {
+      struct tm ntpInfo;
+      int tries = 0;
+      while (!getLocalTime(&ntpInfo, 1000) && tries < 10) {
+        Serial.printf("NTP sync attempt %d/10...\n", ++tries);
+      }
+      if (tries < 10) {
+        Serial.println("NTP sync OK");
+      } else {
+        Serial.println("NTP sync failed — will use GPS time");
+      }
+    }
     // Start mdns so we have a name
 
     if (!MDNS.begin("logbook"))

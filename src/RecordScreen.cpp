@@ -241,7 +241,7 @@ void RecordScreen::updatedDateTime()
 
     struct tm timeinfo;
    
-    if (getLocalTime(&timeinfo))
+    if (getLocalTime(&timeinfo, 0))  // 0ms timeout — never block
     {
         strftime(buffer, 64, "UTC %d-%m-%y %H:%M:%S", (const tm *)&timeinfo);
     }

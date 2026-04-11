@@ -31,6 +31,11 @@ void tState::setupTime(time_t t)
   RTCDate.month = tm->tm_mon + 1;
   RTCDate.date = tm->tm_mday;
   M5.Rtc.setDate(RTCDate);
+
+  // Also sync the POSIX system clock so getLocalTime() works correctly
+  struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+
   timeSet = true;
 }
 
@@ -49,6 +54,19 @@ void tState::setupTimeSK(String datetime)
   RTCtime.minutes = atoi(datetime.substring(14, 16).c_str());
   RTCtime.seconds = atoi(datetime.substring(17, 19).c_str());
   M5.Rtc.setTime(RTCtime); // writes the  time to the (RTC) real time clock.
+
+  // Also sync the POSIX system clock so getLocalTime() works correctly
+  struct tm t2 = {};
+  t2.tm_year = RTCDate.year - 1900;
+  t2.tm_mon  = RTCDate.month - 1;
+  t2.tm_mday = RTCDate.date;
+  t2.tm_hour = RTCtime.hours;
+  t2.tm_min  = RTCtime.minutes;
+  t2.tm_sec  = RTCtime.seconds;
+  time_t epoch = mktime(&t2);
+  struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+
   timeSet = true;
 }
 /* NMEA 2000 support */
@@ -671,7 +689,7 @@ void tState::handleGNSS(const tN2kMsg &N2kMsg)
                nReferenceStations, ReferenceStationType, ReferenceSationID,
                AgeOfCorrection);
 
-  time_t now = SecondsSinceMidnight + (DaysSince1970 * 68400);
+  time_t now = SecondsSinceMidnight + (DaysSince1970 * 86400);
   setupTime(now); // Update local clock with GNSS time
 
   position.when = now;
@@ -868,7 +886,7 @@ void tState::saveCsv(File f, double distance)
 {
   char buffer[100];
   struct tm timeinfo;
-  getLocalTime(&timeinfo);
+  getLocalTime(&timeinfo, 0);  // 0ms timeout — never block
 
   strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
   sprintf(buffer, "%s\t%f\t", buffer, distance);
