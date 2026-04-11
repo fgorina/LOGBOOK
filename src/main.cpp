@@ -752,6 +752,16 @@ void switchTo(int i)
 {
   Screen *oldScreen = currentScreen;
 
+  // If the display is sleeping when a screen switch happens (e.g. recording
+  // stopped while the saver was active), wake it up so the new screen is visible.
+  if (state->displaySaver != DISPLAY_ACTIVE)
+  {
+    M5.Display.wakeup();
+    M5.Display.setBrightness(128);
+    state->displaySaver = DISPLAY_ACTIVE;
+    last_touched = millis();
+  }
+
   if (i >= 0 && i < 5)
   {
     if (screens[i] != nullptr)
@@ -1020,6 +1030,8 @@ void loop()
           Serial.println("Activating");
           state->displaySaver = DISPLAY_ACTIVE;
           last_touched = millis();
+          if (currentScreen != nullptr)
+            currentScreen->draw();  // Refresh after wakeup
         }
       }
     }
