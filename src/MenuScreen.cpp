@@ -3,6 +3,8 @@
 #include "Arduino.h"
 #include <WiFi.h>
 
+extern String deviceName;
+
 MenuScreen::MenuScreen(tState *state, int width, int height, const char *title) : Screen(width, height, title)
 {
     Serial.println("MenuScreen::MenuScreen");
@@ -64,8 +66,9 @@ void MenuScreen::draw()
     M5.Display.setFont(&fonts::FreeSans9pt7b);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     M5.Display.setTextDatum(TC_DATUM);
-    M5.Display.drawString(WiFi.localIP().toString(), width / 2, 10);
-    if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
+   // M5.Display.drawString(WiFi.localIP().toString(), width / 2, 10);
+    M5.Display.drawString(deviceName, width / 2, 10);
+   if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
     {
         brecord->draw();
         bfiles->draw();

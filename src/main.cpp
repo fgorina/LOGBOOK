@@ -118,6 +118,7 @@ int n_sources = 1;
 // static IPAddress signalk_tcp_host = IPAddress(192,168,1,204); //IPAddress(192, 168, 1, 2);
 
 bool starting = true; // Is true if WiFi is not configured
+String deviceName;  // Unique AP SSID, e.g. "LOGBOOK_427"
 // Http Server
 WebServer server(80);
 
@@ -157,7 +158,7 @@ Screen *screens[6] = {
     new MenuScreen(state, TFT_HOR_RES, TFT_VER_RES, "Logs"),
     new RecordScreen(TFT_HOR_RES, TFT_VER_RES, "Record", state, 1000),
     new SDScreen(TFT_HOR_RES, TFT_VER_RES, "Logs", state),
-    new InfoScreen(wifi_ssid, &myIp, &useN2k, &useSK, &use0183, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
+    new InfoScreen(&deviceName, &wifi_ssid, &myIp, &useN2k, &useSK, &use0183, &skServer, &skPort, &n2kSources, TFT_HOR_RES,  TFT_VER_RES, "Info"),
     new N2KDevices(pN2kDeviceList, TFT_HOR_RES,  TFT_VER_RES, "N2k"),
     nullptr,
 };
@@ -188,6 +189,7 @@ void writePreferences()
   preferences.putBool("USE0183", use0183);
   n2kSources = join(sources, MAX_SOURCES, ',');
   preferences.putString("N2KSOURCES", n2kSources);
+  preferences.putString("DEVICENAME", deviceName);
   preferences.end();
 }
 
@@ -203,15 +205,24 @@ void readPreferences()
   useN2k  = preferences.getBool("USEN2K",  false);
   useSK   = preferences.getBool("USESK",   false);
   use0183 = preferences.getBool("USE0183", false);
-  
 
-  n2kSources = preferences.getString("N2KSOURCES", n2kSources);
+  deviceName  = preferences.getString("DEVICENAME", "");
+  n2kSources  = preferences.getString("N2KSOURCES", n2kSources);
   n_sources = splitter((char*) (n2kSources.c_str()), sources, ',', n2kSources.length(), MAX_SOURCES);
   for(int i = n_sources; i < MAX_SOURCES; i++){
     sources[i] = -1;
   }
 
   preferences.end();
+
+  if (deviceName.isEmpty()) {
+    // First boot: generate a unique name and persist it so the same
+    // name survives reboots but differs from every other device.
+    deviceName = "LOGBOOK_" + String(random(100, 1000));
+    preferences.begin("Logbook", false);
+    preferences.putString("DEVICENAME", deviceName);
+    preferences.end();
+  }
   Serial.println("============== Preferences ================= ");
   Serial.print("ssid : ");
   Serial.println(wifi_ssid);
@@ -308,7 +319,7 @@ String getContentType(String filename)
 
 String getFullUri(String last)
 {
-  return "http://logbook.local/" + last;
+  return "http://"+deviceName+".local/" + last;
 }
 
 void handleHelp()
@@ -367,13 +378,19 @@ void handleFileList()
 {
   Serial.println("handleFileList");
 
+  // Stream in chunks: avoids building a large String in heap and lets the
+  // browser receive data progressively without waiting for the full page.
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", "");
+
+  server.sendContent("<html><head><title>Logs</title>"
+                     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                     "</head><body>\n");
+  server.sendContent("<h1><a href=\"" + getFullUri("index.html") + "\">"+deviceName+"</a>/Logs</h1>\n");
+  server.sendContent("<a href=\"" + getFullUri("ask") + "\">Esborrar tots els Logs</a><br>\n");
+  server.sendContent("<ul>\n");
+
   File root = SD.open("/");
-
-  String output = "<htlm><head><title>Logs</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>\n";
-
-  output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Logs</h1>\n";
-  output += "<a href=\"" + getFullUri("ask") + "\">Esborrar tots els Logs</a></br>";
-  output += "<ul>\n";
   if (root.isDirectory())
   {
     File file = root.openNextFile();
@@ -382,17 +399,16 @@ void handleFileList()
       if (file.name()[0] != '.')
       {
         String path = file.path();
-        output += String("<li><a href=\"" + getFullUri(file.path()) + "\">") + file.name() + "</a>    <a href=\"" + getFullUri(String("del/" + path)) + "\">Delete</a></li>\n";
+        server.sendContent("<li><a href=\"" + getFullUri(path) + "\">" +
+                           file.name() + "</a>&nbsp;&nbsp;"
+                           "<a href=\"" + getFullUri("del/" + path) + "\">Delete</a></li>\n");
       }
-
       file = root.openNextFile();
     }
+    root.close();
   }
 
-  output += "</ul>\n";
-  unsigned long len = output.length();
-  server.sendHeader("Content-Length", String(len));
-  server.send(200, "text/html", output);
+  server.sendContent("</ul></body></html>\n");
 }
 
 void handleMenu()
@@ -400,7 +416,7 @@ void handleMenu()
   Serial.println("handleMenu");
   String output = "<html><head>"
                   "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                  "<title>Logbook by Paco Gorina</title>"
+                  "<title>"+deviceName+" by Paco Gorina</title>"
                   "</head><body>";
 
   output += "<h1>Logbook by Paco Gorina</h1>";
@@ -465,7 +481,7 @@ void handlePreferences()
   Serial.println("handlePreferences");
   n2kSources = join(sources, MAX_SOURCES, ',');
   String output = "<html><head><title>Prefer&egrave;ncies</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0</head><body>";
-  output += "<h1><a href=\"" + getFullUri("index.html") + "\">Logbook</a>/Prefer&egrave;ncies</h1>";
+  output += "<h1><a href=\"" + getFullUri("index.html") + "\">"+deviceName+"</a>/Prefer&egrave;ncies</h1>";
   output += "<form action=\"" + getFullUri("updatePrefs") + "\" method=\"post\">";
   output += "<table border=0>";
   output += "<tr><td><label for=\"ssid\">SSID:</label></td><td><input type=\"text\" id=\"ssid\" name=\"ssid\" value=\"" + wifi_ssid + "\"></td></tr>";
@@ -589,6 +605,8 @@ void startWebServer()
                       else if (!handleFileRead(server.uri()))
                       {
                         server.send(404, "text/plain", "FileNotFound");
+                      }else{
+                        Serial.printf("Not Found %s\n", server.uri().c_str());
                       } });
 
   server.begin();
@@ -596,15 +614,15 @@ void startWebServer()
 }
 boolean startWiFiAP()
 {
-  Serial.println("Creating wifi logbook / 123456 ");
+  Serial.println("Creating wifi AP: " + deviceName + " / 12345678");
   WiFi.mode(wifi_mode_t::WIFI_MODE_AP);
-  WiFi.softAP("logbook", "12345678");
+  WiFi.softAP(deviceName.c_str(), "12345678");
   IPAddress IP = WiFi.softAPIP();
   Serial.println("Ip : " + IP.toString());
 
   // Start mdns so we have a name
 
-  if (!MDNS.begin("logbook"))
+  if (!MDNS.begin(deviceName.c_str()))
   {
     Serial.println("Error setting up MDNS responder!");
   }
@@ -653,7 +671,7 @@ boolean startWiFi()
     }
     // Start mdns so we have a name
 
-    if (!MDNS.begin("logbook"))
+    if (!MDNS.begin(deviceName.c_str()))
     {
       Serial.println("Error setting up MDNS responder!");
     }
@@ -793,13 +811,20 @@ void networkTask(void *parameter)
 
   while (true)
   {
-    if (!checkConnection() && !wifi_ssid.isEmpty())
+    // Check wifi_ssid first (cheap). In AP mode wifi_ssid is empty so
+    // checkConnection() — which blocks up to 10 s waiting for WL_CONNECTED —
+    // is never called, letting handleClient() run at full speed.
+    if (!wifi_ssid.isEmpty() && !checkConnection())
     {
+      Serial.println("Starting WiFi");
       startWiFi();
     }
 
     server.handleClient();
-   
+
+    // 10 ms yield is enough for interactive use (100 callbacks/sec).
+    // A tighter loop hammers the lwIP core mutex, blocking the WiFi driver's
+    // WPA2 handshake and making AP-mode connections appear to fail.
     vTaskDelay(10);
   }
 }
@@ -864,7 +889,7 @@ void resetNetwork()
 {
   // Sets preferences to work as STA
   // with ssig "logbook"
-  // and passwd "123456"
+  // and passwd "12345678"
   // No SK
   // No N2k
 
@@ -967,7 +992,9 @@ void setup()
 
   // M5.Lcd.wakeup();
   Serial.println("Starting Tasks");
-  xTaskCreate(networkTask, "NetworkTask",4000,NULL,1,&taskNetwork);
+  // 16 KB stack: the web-server call chain (handleClient → handler → SD/FATFS)
+  // overflows a 4 KB stack, causing silent hangs on any SD access.
+  xTaskCreate(networkTask, "NetworkTask", 16384, NULL, 1, &taskNetwork);
   Serial.println("Network Task Created");
   if(useN2k){ 
      xTaskCreate(n2KTask, "N2kTask",4000,NULL,0,&taskN2K);

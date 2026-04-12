@@ -141,16 +141,21 @@ void NetNMEA0183::processLine(const char *line)
         state->onNMEA0183Wind(angle, speed, ref == 'R');
     }
     // xRMC,<time>,<status>,<lat>,<NS>,<lon>,<EW>,<sog>,<cog>,<date>,...
-    else if (strcmp(type, "RMC") == 0 && n >= 10 && fields[2][0] == 'A') {
-        float lat = parseDegMin(fields[3], fields[4][0]);
-        float lon = parseDegMin(fields[5], fields[6][0]);
-        float sog = atof(fields[7]) * 0.514444f; // knots -> m/s
-        float cog = atof(fields[8]) * DEG_TO_RAD;
-        //Serial.printf("Position %0.4f %0.4f\n", lat, lon);
-        state->onNMEA0183Position(lat, lon);
-        state->onNMEA0183SOGCOGTrue(sog, cog);
+    else if (strcmp(type, "RMC") == 0 && n >= 10) {
+        // Time/date are valid even before the GPS has a position fix (status 'V'),
+        // so try to sync the clock regardless of status.
         if (fields[1][0] && fields[9][0])
             state->onNMEA0183DateTime(fields[1], fields[9]);
+        // Position/speed data are only reliable with a valid fix (status 'A').
+        if (fields[2][0] == 'A') {
+            float lat = parseDegMin(fields[3], fields[4][0]);
+            float lon = parseDegMin(fields[5], fields[6][0]);
+            float sog = atof(fields[7]) * 0.514444f; // knots -> m/s
+            float cog = atof(fields[8]) * DEG_TO_RAD;
+            //Serial.printf("Position %0.4f %0.4f\n", lat, lon);
+            state->onNMEA0183Position(lat, lon);
+            state->onNMEA0183SOGCOGTrue(sog, cog);
+        }
     }
     // xGGA,<time>,<lat>,<NS>,<lon>,<EW>,<fix>,...
     else if (strcmp(type, "GGA") == 0 && n >= 7 && atoi(fields[6]) > 0) {

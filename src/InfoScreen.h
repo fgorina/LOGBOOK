@@ -10,7 +10,7 @@
 class InfoScreen : public Screen
 {
 public:
-    InfoScreen(String ssid, String *ip, bool* useN2k, bool* useSK, bool* use0183, String* skServer, int* skPort,  String* sources, int width, int height, const char *title);
+    InfoScreen(String *deviceName, String *ssid, String *ip, bool* useN2k, bool* useSK, bool* use0183, String* skServer, int* skPort,  String* sources, int width, int height, const char *title);
 
     void enter() override;
     void exit() override;
@@ -20,11 +20,13 @@ public:
 protected:
     Button *bexit = nullptr;
     Button *bDevices = nullptr;
+    Button *bReboot = nullptr;
 
-    String ssid;
+    String *ssid;
 
     String *ip;
 
+    String* deviceName;
     bool* useN2k;
     bool* useSK;
     bool* use0183;

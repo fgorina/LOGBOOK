@@ -885,11 +885,12 @@ void tState::tState::printInfo()
 void tState::saveCsv(File f, double distance)
 {
   char buffer[100];
+  char timebuf[32];
   struct tm timeinfo;
   getLocalTime(&timeinfo, 0);  // 0ms timeout — never block
 
-  strftime(buffer, 64, "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
-  sprintf(buffer, "%s\t%f\t", buffer, distance);
+  strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
+  sprintf(buffer, "%s\t%f\t", timebuf, distance);
   f.print(buffer);
   sprintf(buffer, "%f\t%f\t", position.longitude, position.latitude);
   f.print(buffer);
@@ -1224,8 +1225,21 @@ void tState::onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy)
   d.month = (ddmmyy[2]-'0')*10 + (ddmmyy[3]-'0');
   d.year  = 2000 + (ddmmyy[4]-'0')*10 + (ddmmyy[5]-'0');
   M5.Rtc.setDate(d);
+
+  // Also sync the POSIX system clock so getLocalTime() / time() work correctly
+  struct tm t2 = {};
+  t2.tm_year = d.year - 1900;
+  t2.tm_mon  = d.month - 1;
+  t2.tm_mday = d.date;
+  t2.tm_hour = t.hours;
+  t2.tm_min  = t.minutes;
+  t2.tm_sec  = t.seconds;
+  time_t epoch = mktime(&t2);
+  struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+
   timeSet = true;
-  Serial.println("NMEA0183: RTC set from GPS");
+  Serial.println("NMEA0183: RTC and system clock set from GPS");
 }
 
 /* Signal K Parsing */
