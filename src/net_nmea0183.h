@@ -20,7 +20,11 @@ private:
     WiFiClient client;
     bool connected = false;
     unsigned long lastActivity = 0;
+    unsigned long lastValidData = 0;
+    unsigned long lastConnectAttempt = 0;
     static const unsigned long TIMEOUT_MS = 10000;
+    static const unsigned long WATCHDOG_MS = 5000;
+    static const unsigned long RETRY_MS = 2000;
 
     char lineBuf[128];
     int  lineLen = 0;

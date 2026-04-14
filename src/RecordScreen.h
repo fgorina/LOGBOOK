@@ -59,6 +59,19 @@ class RecordScreen : public Screen
     void  saveFooter(File f);
     double haversine(double lat1, double lon1, double lat2, double lon2);   // Distances lox in Nm
     size_t compressFile( const String &inputFilename);
+
+    // Moving filter (EMA on velocity vector)
+    float fastX_ = 0, fastY_ = 0;
+    float slowX_ = 0, slowY_ = 0;
+    bool  filterMoving_      = false;
+    bool  filterInitialized_ = false;
+
+    static constexpr float START_THRESH = 0.26f;   // m/s fast EMA → start
+    static constexpr float STOP_THRESH  = 0.15f;   // m/s slow EMA → stop
+    static constexpr float ALPHA_FAST   = 0.0056f;
+    static constexpr float ALPHA_SLOW   = 0.0017f;
+
+    void updateMovingFilter();
 };
 
 #endif

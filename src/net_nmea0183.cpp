@@ -14,7 +14,7 @@ void NetNMEA0183::run()
     if (WiFi.status() != WL_CONNECTED) return;
 
     if (!connected || !client.connected()) {
-        if (millis() - lastActivity > TIMEOUT_MS) {
+        if (millis() - lastConnectAttempt > RETRY_MS) {
             disconnect();
             connect();
         }
@@ -40,6 +40,14 @@ void NetNMEA0183::run()
         Serial.println("NMEA0183: timeout, reconnecting");
         disconnect();
         connect();
+        return;
+    }
+
+    // Watchdog — receiving bytes but no valid parsed sentence
+    if (millis() - lastValidData > WATCHDOG_MS) {
+        Serial.println("NMEA0183: watchdog, no valid data, reconnecting");
+        disconnect();
+        connect();
     }
 }
 
@@ -47,15 +55,16 @@ bool NetNMEA0183::connect()
 {
     if (strlen(host) == 0 || port <= 0) return false;
     Serial.printf("NMEA0183: connecting to %s:%d\n", host, port);
+    lastConnectAttempt = millis();
     if (client.connect(host, port)) {
         Serial.println("NMEA0183: connected");
         connected = true;
         lastActivity = millis();
+        lastValidData = millis();
         lineLen = 0;
         return true;
     }
     Serial.println("NMEA0183: connection failed");
-    lastActivity = millis(); // reset so we don't hammer the server
     return false;
 }
 
@@ -130,6 +139,8 @@ void NetNMEA0183::processLine(const char *line)
     if (tag[0] != '$' || strlen(tag) < 4) return;
     const char *type = tag + 3;   // e.g. "MWV", "RMC", "GGA" ...
 
+    bool dispatched = false;
+
     // xMWV,<angle>,<ref>,<speed>,<unit>,<status>
     // ref: R=relative(apparent), T=true
     if (strcmp(type, "MWV") == 0 && n >= 6 && fields[5][0] == 'A') {
@@ -139,6 +150,7 @@ void NetNMEA0183::processLine(const char *line)
         if (fields[4][0] == 'K') speed /= 3.6f;        // km/h -> m/s
         else if (fields[4][0] == 'N') speed *= 0.514444f; // knots -> m/s
         state->onNMEA0183Wind(angle, speed, ref == 'R');
+        dispatched = true;
     }
     // xRMC,<time>,<status>,<lat>,<NS>,<lon>,<EW>,<sog>,<cog>,<date>,...
     else if (strcmp(type, "RMC") == 0 && n >= 10) {
@@ -156,29 +168,36 @@ void NetNMEA0183::processLine(const char *line)
             state->onNMEA0183Position(lat, lon);
             state->onNMEA0183SOGCOGTrue(sog, cog);
         }
+        dispatched = true;
     }
     // xGGA,<time>,<lat>,<NS>,<lon>,<EW>,<fix>,...
     else if (strcmp(type, "GGA") == 0 && n >= 7 && atoi(fields[6]) > 0) {
         float lat = parseDegMin(fields[2], fields[3][0]);
         float lon = parseDegMin(fields[4], fields[5][0]);
         state->onNMEA0183Position(lat, lon);
+        dispatched = true;
     }
     // xVTG,<cogT>,T,<cogM>,M,<sogN>,N,<sogK>,K,...
     else if (strcmp(type, "VTG") == 0 && n >= 7) {
         float cog = atof(fields[1]) * DEG_TO_RAD;
         float sog = atof(fields[5]) * 0.514444f; // knots -> m/s
         state->onNMEA0183SOGCOGTrue(sog, cog);
+        dispatched = true;
     }
     // xHDG,<mag>,<dev>,<devEW>,<var>,<varEW>
     else if (strcmp(type, "HDG") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingMagnetic(hdg);
+        dispatched = true;
     }
     // xHDT,<true>,T
     else if (strcmp(type, "HDT") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingTrue(hdg);
+        dispatched = true;
     } else {
         //Serial.printf("Unknown sequence %s\n", line);
     }
+
+    if (dispatched) lastValidData = millis();
 }

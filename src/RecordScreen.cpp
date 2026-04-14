@@ -25,6 +25,9 @@ void RecordScreen::exit()
 {
     Serial.println("RecordScreen::exit");
 
+    if (recording)
+        stopRecord();
+
     if (brecord != nullptr)
     {
         brecord->delHandlers();
@@ -238,19 +241,13 @@ size_t RecordScreen::compressFile( const String &inputFilename)
 
 void RecordScreen::updatedDateTime()
 {
-
-    struct tm timeinfo;
-   
-    if (getLocalTime(&timeinfo, 0))  // 0ms timeout — never block
-    {
-        strftime(buffer, 64, "UTC %d-%m-%y %H:%M:%S", (const tm *)&timeinfo);
-    }
-    else
-    {
+    time_t now = time(nullptr);
+    struct tm *ti = gmtime(&now);
+    if (ti->tm_year > (2000 - 1900)) {
+        strftime(buffer, 64, "UTC %d-%m-%y %H:%M:%S", ti);
+    } else {
         Serial.println("Problemes amb RTC");
-        time_t now = time(nullptr);
-        struct tm *ti = localtime(&now);
-        strftime(buffer, 64, "%y-%m-%d %H:%M:%S", ti);
+        strncpy(buffer, "No time", sizeof(buffer));
     }
 }
 void RecordScreen::newFilename(char *buff, int maxbuff)

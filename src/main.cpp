@@ -164,6 +164,65 @@ Screen *screens[6] = {
 };
 
 boolean startWiFi();
+void switchTo(int i);
+
+// ── Moving filter (EMA on velocity vector) ───────────────────────────────────
+// Same algorithm and constants as Tab5Nav.
+// Runs every second in loop(); auto-starts recording when the boat starts
+// moving (switches to RecordScreen) and stops when it becomes stationary.
+static float mf_fastX = 0, mf_fastY = 0;
+static float mf_slowX = 0, mf_slowY = 0;
+static bool  mf_moving      = false;
+static bool  mf_initialized = false;
+static unsigned long mf_lastUpdate = 0;
+
+static constexpr float MF_START_THRESH = 0.26f;   // m/s, fast EMA → start
+static constexpr float MF_STOP_THRESH  = 0.15f;   // m/s, slow EMA → stop
+static constexpr float MF_ALPHA_FAST   = 0.0056f;
+static constexpr float MF_ALPHA_SLOW   = 0.004f; // τ ≈ 5 min
+
+void updateMovingFilter()
+{
+    if (millis() - mf_lastUpdate < 1000) return;
+    mf_lastUpdate = millis();
+
+    // Treat stale SOG as 0 — data source went silent
+    float sog = (time(nullptr) - state->sog.when <= 10) ? (float)state->sog.value : 0.0f;
+    // COG is undefined at zero speed — use 0 (velocity vector is zero regardless)
+    float cog = (!isnan(state->cog.heading)) ? state->cog.heading : 0.0f;
+
+    float vx = sog * sinf(cog);
+    float vy = sog * cosf(cog);
+
+    if (!mf_initialized) {
+        mf_fastX = mf_slowX = vx;
+        mf_fastY = mf_slowY = vy;
+        mf_initialized = true;
+    } else {
+        mf_fastX += MF_ALPHA_FAST * (vx - mf_fastX);
+        mf_fastY += MF_ALPHA_FAST * (vy - mf_fastY);
+        mf_slowX += MF_ALPHA_SLOW * (vx - mf_slowX);
+        mf_slowY += MF_ALPHA_SLOW * (vy - mf_slowY);
+    }
+
+    float fastMag = sqrtf(mf_fastX * mf_fastX + mf_fastY * mf_fastY);
+    float slowMag = sqrtf(mf_slowX * mf_slowX + mf_slowY * mf_slowY);
+
+    bool wasMoving = mf_moving;
+    if (!mf_moving && fastMag >= MF_START_THRESH)
+        mf_moving = true;
+    else if (mf_moving && slowMag < MF_STOP_THRESH)
+        mf_moving = false;
+
+    if (!wasMoving && mf_moving && currentScreen == screens[0]) {
+        Serial.println("MovingFilter: started moving → switching to RecordScreen");
+        switchTo(1);
+    } else if (wasMoving && !mf_moving && currentScreen == screens[1]) {
+        Serial.println("MovingFilter: stopped moving → switching to MenuScreen");
+        mf_initialized = false;   // reset so stale EMA can't immediately re-trigger
+        switchTo(0);
+    }
+}
 
 // Preferences
 
@@ -1035,6 +1094,7 @@ void loop()
 {
   M5.update();
   auto &t = M5.Touch.getDetail(0);
+  updateMovingFilter();
   uiTask(t);
   
     auto count = M5.Touch.getCount();
