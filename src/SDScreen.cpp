@@ -1,4 +1,5 @@
 #include "SDScreen.h"
+#include "Utilities.h"
 
 SDScreen::SDScreen(int width, int height, const char *title, tState *state) : Screen(width, height, title)
 {
@@ -90,7 +91,10 @@ int SDScreen::run(const m5::touch_detail_t &t)
 
 void SDScreen::loadSD()
 {
-  File root = SD.open("/");
+  if (!SD.exists("/logs"))
+    SD.mkdir("/logs");
+
+  File root = SD.open("/logs");
   n_files = 0;
   if (root)
   {
@@ -161,6 +165,7 @@ void SDScreen::sortFiles()
   qsort(sd_files, n_files, MAXNAME, compareStrings);
 }
 
+
 void SDScreen::do_select_file(int tx, int ty)
 {
 
@@ -177,6 +182,20 @@ void SDScreen::do_select_file(int tx, int ty)
       drawFile(selected_file, false);
       selected_file = line;
       drawFile(selected_file, true);
+
+      char sdPath[MAXNAME + 8];
+      snprintf(sdPath, sizeof(sdPath), "/logs/%s", sd_files[selected_file]);
+      if (uploadFile(sdPath))
+      {
+        // File was moved to /sent — reload the listing
+        selected_file = -1;
+        loadSD();
+        drawSD();
+      }
+      else
+      {
+        Serial.printf("[ERROR] do_select_file: upload failed for %s\n", sdPath);
+      }
     }
     else
     {

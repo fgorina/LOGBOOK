@@ -136,6 +136,9 @@ void writePreferences();
 void readPreferences();
 void lookupPypilot();
 
+// SD mutex — acquire before any SD card access
+SemaphoreHandle_t sdMutex;
+
 // Test variables
 
 double speed = 5.0;   // 5 knots
@@ -1035,6 +1038,8 @@ void setup()
 
   M5.Display.setFont(&fonts::FreeSans12pt7b);
   M5.Display.setTextSize(1.0);
+  sdMutex = xSemaphoreCreateMutex();
+
   // Core2: SD uses VSPI, CS=GPIO4, CLK=GPIO18, MISO=GPIO38, MOSI=GPIO23
   SPI.begin(18, 38, 23, 4);
   if (!SD.begin(4, SPI, 25000000)) {

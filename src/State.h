@@ -10,6 +10,7 @@
 #include <ArduinoJson.h>
 
 #include "Constants.h"
+#include "WindKalman.h"
 
 
 
@@ -19,6 +20,9 @@ protected:
 
     bool verbose = false;
     bool timeSet = false;
+
+    WindKalmanPolar windFilter_;
+    void runWindFilter(uint64_t nowMs);
 
 
 
@@ -57,6 +61,7 @@ public:
     void onNMEA0183HeadingMagnetic(float hdgRad);
     void onNMEA0183HeadingTrue(float hdgRad);
     void onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy);
+    void onNMEA0183Attitude(float rollRad, float pitchRad);
     int displaySaver = DISPLAY_ACTIVE;
 
     tHeadingData cog{when : 0, origin : 0, reference : tN2kHeadingReference::N2khr_Unavailable, heading : 0.0};
@@ -75,7 +80,8 @@ public:
     tDoubleData rateOfTurn{when : 0, origin : 0, value : 0.0}; // degrees/s
    
     tDoubleData rudderAngle{when : 0, origin : 0, value : 0.0};     // rudder.angle
-    tWindData trueWind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
+    tWindData trueWind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle — raw
+    tWindData filteredTrueWind{.when = 0, .origin = 0, .reference = tN2kWindReference::N2kWind_True_North, .speed = 0.0, .angle = 0.0}; // Kalman-filtered TWD/TWS
     tWindData apparentWind{when : 0, origin : 0, reference: tN2kWindReference::N2kWind_Apparent, speed : 0.0, angle : 0.0}; // wind.speed, wind.angle
     
     tDoubleData rpm{when : 0, origin : 0, value : 0.0}; // RPM

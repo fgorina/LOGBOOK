@@ -465,6 +465,7 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
     trueWind.reference = windReference;
     trueWind.angle = windAngle;
     trueWind.speed = windSpeed;
+    runWindFilter((uint64_t)millis());
   }
 
   if (!verbose)
@@ -754,6 +755,16 @@ int8_t EngineTorque;
 126992   15    Date/Time
 
 */
+void tState::runWindFilter(uint64_t nowMs)
+{
+    WindKalmanResult r = windFilter_.update(trueWind.angle, trueWind.speed, nowMs);
+    filteredTrueWind.when      = trueWind.when;
+    filteredTrueWind.origin    = trueWind.origin;
+    filteredTrueWind.reference = trueWind.reference;
+    filteredTrueWind.angle     = r.angle;
+    filteredTrueWind.speed     = r.speed;
+}
+
 void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose)
 {
   this->verbose = verbose;
@@ -880,41 +891,84 @@ void tState::tState::printInfo()
 
 */
 
-// Exports a record (an instant) to the csv file
+// Exports a record (an instant) to the csv file.
+// All values in SI — no unit conversions.
+// distance parameter is in NM (from RecordScreen), converted here to metres.
 
 void tState::saveCsv(File f, double distance)
 {
-  char buffer[100];
   char timebuf[32];
-  struct tm timeinfo;
-  getLocalTime(&timeinfo, 0);  // 0ms timeout — never block
+  struct tm timeinfo = {};
+  if (!getLocalTime(&timeinfo, 0)) {
+    // System clock not synced — fall back to RTC
+    auto rtcDate = M5.Rtc.getDate();
+    auto rtcTime = M5.Rtc.getTime();
+    timeinfo.tm_year  = rtcDate.year - 1900;
+    timeinfo.tm_mon   = rtcDate.month - 1;
+    timeinfo.tm_mday  = rtcDate.date;
+    timeinfo.tm_hour  = rtcTime.hours;
+    timeinfo.tm_min   = rtcTime.minutes;
+    timeinfo.tm_sec   = rtcTime.seconds;
+  }
+  strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
 
-  strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", (const tm *)&timeinfo);
-  sprintf(buffer, "%s\t%f\t", timebuf, distance);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t", position.longitude, position.latitude);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t", cog.heading / PI * 180.0, sog.value * 3600.0 / 1852.0);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t%f\t", magneticHeading.heading / PI * 180.0, trueHeading.heading / PI * 180.0, rudderAngle.value);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t%f\t", attitude.pitch / PI * 180.0, attitude.roll / PI * 180.0, rateOfTurn.value / PI * 180.0);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t", apparentWind.angle / PI * 180.0, apparentWind.speed * 3600.0 / 1852.0);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f\t", trueWind.angle / PI * 180.0, trueWind.speed * 3600.0 / 1852.0);
-  f.print(buffer);
-  sprintf(buffer, "%f\t", depth.value);
-  f.print(buffer);
-  sprintf(buffer, "%f\t%f", rpm.value * 60, engineTemperature.value - 273.15);
-  f.print(buffer);
+  // time, distance(m)
+  f.print(timebuf);
+  f.print('\t'); f.print(distance * NM_TO_METERS, 3);
+
+  // LON_raw, LAT_raw (degrees)
+  f.print('\t'); f.print(position.longitude, 8);
+  f.print('\t'); f.print(position.latitude,  8);
+
+  // COG(rad), SOG(m/s)
+  f.print('\t'); f.print(cog.heading,  6);
+  f.print('\t'); f.print(sog.value,    6);
+
+  // HDGm_raw(rad), HDG(rad), RDR_raw(rad)
+  f.print('\t'); f.print(magneticHeading.heading, 6);
+  f.print('\t'); f.print(trueHeading.heading,     6);
+  f.print('\t'); f.print(rudderAngle.value,        6);
+
+  // PITCH_raw(rad), HEEL_raw(rad), ROT_raw(rad/s)
+  f.print('\t'); f.print(attitude.pitch, 6);
+  f.print('\t'); f.print(attitude.roll,  6);
+  f.print('\t'); f.print(rateOfTurn.value, 6);
+
+  // AWA_raw(rad), AWS_raw(m/s)
+  f.print('\t'); f.print(apparentWind.angle, 6);
+  f.print('\t'); f.print(apparentWind.speed, 6);
+
+  // TWD_raw(rad), TWS_raw(m/s)  — raw trueWind
+  f.print('\t'); f.print(trueWind.angle, 6);
+  f.print('\t'); f.print(trueWind.speed, 6);
+
+  // DPT(m), RPM(Hz), EngTw(K)
+  f.print('\t'); f.print(depth.value,              3);
+  f.print('\t'); f.print(rpm.value,                3);
+  f.print('\t'); f.print(engineTemperature.value,  2);
+
+  // TWD(rad), TWS(m/s) — Kalman-filtered
+  f.print('\t'); f.print(filteredTrueWind.angle, 6);
+  f.print('\t'); f.print(filteredTrueWind.speed, 6);
+
+  // Placeholder columns (not computed here)
+  f.print("\t0\t0\t0\t0\t0\t0");
+
   f.println();
 }
+
 // Stores the csv header with field names
 
 void tState::saveCsvHeader(File f)
 {
-  f.println("UTC\tDistance\tLongitude\tLatitude\tCOG\tSOG\tHeading Mag\tHeading True\tRudder Angle\tPitch\tRoll\tRateOfTurn\tAWA\tAWS\tTWD\tTWS\tDepth(m)\tRPM\tT Engine ºC");
+  f.println("time\tdistance\tLON_raw\tLAT_raw\tCOG\tSOG"
+            "\tHDGm_raw\tHDG\tRDR_raw"
+            "\tPITCH_raw\tHEEL_raw\tROT_raw"
+            "\tAWA_raw\tAWS_raw"
+            "\tTWD_raw\tTWS_raw"
+            "\tDPT\tRPM\tEngTw"
+            "\tTWD\tTWS"
+            "\tWind\tGust\tAWA\tAWS\tOM_grade\tENV_grade");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions
@@ -922,16 +976,22 @@ void tState::saveCsvHeader(File f)
 void tState::saveGPXTrackpoint(File f, double distance)
 {
   char buffer[100];
-  struct tm timeinfo;
+  struct tm timeinfo = {};
 
-  if (!getLocalTime(&timeinfo))
-  {
-    Serial.println("No tinc dades de temps");
+  if (!getLocalTime(&timeinfo, 0)) {
+    auto rtcDate = M5.Rtc.getDate();
+    auto rtcTime = M5.Rtc.getTime();
+    timeinfo.tm_year  = rtcDate.year - 1900;
+    timeinfo.tm_mon   = rtcDate.month - 1;
+    timeinfo.tm_mday  = rtcDate.date;
+    timeinfo.tm_hour  = rtcTime.hours;
+    timeinfo.tm_min   = rtcTime.minutes;
+    timeinfo.tm_sec   = rtcTime.seconds;
   }
 
   sprintf(buffer, "<trkpt lat=\"%f\" lon=\"%f\">", position.latitude, position.longitude);
   f.println(buffer);
-  strftime(buffer, 64, "<time>%Y-%m-%dT%H:%M:%SZ</time>", (const tm *)&timeinfo);
+  strftime(buffer, 64, "<time>%Y-%m-%dT%H:%M:%SZ</time>", &timeinfo);
   f.println(buffer);
   f.println("<extensions>");
 
@@ -1108,6 +1168,7 @@ void tState::onSignalKDelta(const char *path, JsonVariantConst value)
       trueWind.when = now; trueWind.origin = -1;
       trueWind.reference = tN2kWindReference::N2kWind_True_North;
       trueWind.angle = value.as<float>();
+      runWindFilter((uint64_t)millis());
     }
   }
   else if (strcmp(path, "environment.wind.speedApparent") == 0) {
@@ -1123,6 +1184,7 @@ void tState::onSignalKDelta(const char *path, JsonVariantConst value)
       trueWind.when = now; trueWind.origin = -1;
       trueWind.reference = tN2kWindReference::N2kWind_True_North;
       trueWind.speed = value.as<float>();
+      runWindFilter((uint64_t)millis());
     }
   }
   // --- environment.depth ---
@@ -1167,6 +1229,7 @@ void tState::onNMEA0183Wind(float angleRad, float speedMs, bool apparent)
     trueWind.reference = tN2kWindReference::N2kWind_True_North;
     if (!isnan(angleRad)) trueWind.angle = angleRad;
     if (!isnan(speedMs))  trueWind.speed = speedMs;
+    runWindFilter((uint64_t)millis());
   }
 }
 
@@ -1240,6 +1303,16 @@ void tState::onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy)
 
   timeSet = true;
   Serial.println("NMEA0183: RTC and system clock set from GPS");
+}
+
+void tState::onNMEA0183Attitude(float rollRad, float pitchRad)
+{
+  if (isnan(rollRad) && isnan(pitchRad)) return;
+  time_t now = time(nullptr);
+  attitude.when   = now;
+  attitude.origin = -2;  // NMEA0183 source
+  if (!isnan(rollRad))  attitude.roll  = rollRad;
+  if (!isnan(pitchRad)) attitude.pitch = pitchRad;
 }
 
 /* Signal K Parsing */

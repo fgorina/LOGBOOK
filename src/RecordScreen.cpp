@@ -2,6 +2,7 @@
 #include <ESP32-targz.h>
 
 #include "RecordScreen.h"
+#include "Utilities.h"
 #include <Arduino.h>
 
 RecordScreen::RecordScreen(int width, int height, const char *title, tState *state, time_t period) : Screen(width, height, title)
@@ -154,6 +155,8 @@ void RecordScreen::startRecord()
 
 
     // We build a new filename
+    if (!SD.exists("/logs"))
+        SD.mkdir("/logs");
     newFilename(filename, LENNAME);
     file = SD.open(filename, FILE_WRITE);
     saveHeader(file, filename);
@@ -176,8 +179,11 @@ void RecordScreen::stopRecord()
     saveFooter(file);
     file.flush();
     file.close();
-    if( compressFile(filename) > 0){
+    String gzFilename = String(filename) + ".gz";
+    if (compressFile(filename) > 0)
+    {
         SD.remove(filename);
+        uploadFile(gzFilename.c_str());   // moves to /sent on success
     }
     file = File();
     recording = false;
@@ -255,9 +261,9 @@ void RecordScreen::newFilename(char *buff, int maxbuff)
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
     if(xmlFormat){
-        strftime(buff, maxbuff, "/%y%m%d_%H%M.gpx", timeinfo);
+        strftime(buff, maxbuff, "/logs/%y%m%d_%H%M.gpx", timeinfo);
     }else{
-        strftime(buff, maxbuff, "/%y%m%d_%H%M.csv", timeinfo);
+        strftime(buff, maxbuff, "/logs/%y%m%d_%H%M.csv", timeinfo);
     }
     
 }

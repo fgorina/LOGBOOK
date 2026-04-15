@@ -78,7 +78,7 @@ void NetNMEA0183::disconnect()
 // Expected format: $....*XX  (XX = hex XOR of chars between $ and *)
 bool NetNMEA0183::validChecksum(const char *line)
 {
-    if (line[0] != '$') return false;
+    if (line[0] != '$' && line[0] != '!') return false;
     const char *star = strchr(line, '*');
     if (!star || strlen(star) < 3) return false;
     uint8_t calc = 0;
@@ -134,10 +134,13 @@ void NetNMEA0183::processLine(const char *line)
     int n = splitFields(buf, fields, 20);
     if (n < 1) return;
 
-    // Skip '$' + 2-char talker ID, compare only the 3-char sentence type
-    const char *tag = fields[0];  // e.g. "$WIMWV"
-    if (tag[0] != '$' || strlen(tag) < 4) return;
+    // Skip '$'/'!' + 2-char talker ID, compare only the 3-char sentence type
+    const char *tag = fields[0];  // e.g. "$WIMWV" or "!AIVDM"
+    if ((tag[0] != '$' && tag[0] != '!') || strlen(tag) < 4) return;
     const char *type = tag + 3;   // e.g. "MWV", "RMC", "GGA" ...
+
+    // AIS sentences (VDM/VDO) — valid but not parsed here
+    if (strcmp(type, "VDM") == 0 || strcmp(type, "VDO") == 0) return;
 
     bool dispatched = false;
 
@@ -195,6 +198,26 @@ void NetNMEA0183::processLine(const char *line)
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingTrue(hdg);
         dispatched = true;
+    }
+    // xXDR,<type>,<value>,<unit>,<id>[,<type>,<value>,<unit>,<id>...]
+    // Angular (A) transducers: HEEL/ROLL -> roll, PTCH/PITCH -> pitch (degrees)
+    else if (strcmp(type, "XDR") == 0 && n >= 5) {
+        float roll  = NAN;
+        float pitch = NAN;
+        // Each transducer group occupies 4 fields starting at index 1
+        for (int i = 1; i + 3 < n; i += 4) {
+            if (fields[i][0] != 'A') continue;  // only Angular type
+            const char *id  = fields[i + 3];
+            float val = atof(fields[i + 1]) * DEG_TO_RAD;
+            if (strcasecmp(id, "HEEL") == 0 || strcasecmp(id, "ROLL") == 0)
+                roll = val;
+            else if (strcasecmp(id, "PTCH") == 0 || strcasecmp(id, "PITCH") == 0)
+                pitch = val;
+        }
+        if (!isnan(roll) || !isnan(pitch)) {
+            state->onNMEA0183Attitude(roll, pitch);
+            dispatched = true;
+        }
     } else {
         //Serial.printf("Unknown sequence %s\n", line);
     }
