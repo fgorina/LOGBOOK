@@ -1023,7 +1023,7 @@ void setup()
 {
 
   M5.begin();
-  M5.Display.setRotation(1); // 3 per la versio NMESA 2000
+  M5.Display.setRotation(3); // 3 per la versio NMEA 2000
   Serial.begin(115200);
   M5.Display.wakeup();
   readPreferences();

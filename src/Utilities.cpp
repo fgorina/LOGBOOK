@@ -39,8 +39,30 @@ std::string generateUUID()
     return uuid;
 }
 
+static const char *kServerBase = "http://192.168.1.150:8765";
+
+bool pingServer()
+{
+    HTTPClient http;
+    String url = String(kServerBase) + "/ping";
+    http.begin(url);
+    http.setTimeout(3000);
+    int code = http.GET();
+    http.end();
+    if (code != 200)
+    {
+        Serial.printf("[INFO] pingServer: /ping returned %d — server unreachable\n", code);
+        return false;
+    }
+    return true;
+}
+
 bool uploadFile(const char *sdPath)
 {
+    // 0. Check server reachability
+    if (!pingServer())
+        return false;
+
     // 1. Generate UUID
     std::string uuid = generateUUID();
 
@@ -94,7 +116,7 @@ bool uploadFile(const char *sdPath)
 
     // 4. POST — blocking call
     HTTPClient http;
-    http.begin("http://192.168.1.150:8765/upload");
+    http.begin(String(kServerBase) + "/upload");
     http.addHeader("Content-Type",
                    String("multipart/form-data; boundary=") + boundary);
 
