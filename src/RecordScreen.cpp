@@ -320,6 +320,9 @@ void  RecordScreen::saveFooter(File f){
 }
 
 void RecordScreen::saveData(File f){
+    // Flush any pending connection events before the normal data row
+    state->flushConnEvents(f, miles, xmlFormat);
+
     rows_not_saved++;
     bool doflush = rows_not_saved >= max_rows_not_saved;
 

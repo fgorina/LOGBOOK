@@ -1072,6 +1072,51 @@ void tState::saveGPXFooter(File f)
   f.println("</trkseg>\n</trk>\n</gpx>");
 }
 
+// Connection event log
+
+void tState::pushConnEvent(int code)
+{
+    int idx = connEventCount;   // read once (volatile)
+    if (idx < MAX_CONN_EVENTS) {
+        connEventQueue[idx] = code;
+        connEventCount = idx + 1;   // publish after writing data
+    }
+}
+
+void tState::flushConnEvents(File f, double distance, bool xmlFormat)
+{
+    int n = connEventCount;     // snapshot
+    connEventCount = 0;         // consume all
+    for (int i = 0; i < n; i++) {
+        int code = connEventQueue[i];
+        if (xmlFormat) {
+            // Reuse saveGPXTrackpoint with the event code in <pvt:dist>
+            char timebuf[32];
+            struct tm timeinfo = {};
+            if (!getLocalTime(&timeinfo, 0)) {
+                auto d = M5.Rtc.getDate(); auto t = M5.Rtc.getTime();
+                timeinfo.tm_year = d.year-1900; timeinfo.tm_mon = d.month-1;
+                timeinfo.tm_mday = d.date;
+                timeinfo.tm_hour = t.hours; timeinfo.tm_min = t.minutes; timeinfo.tm_sec = t.seconds;
+            }
+            strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+            char buf[64];
+            sprintf(buf, "<trkpt lat=\"%f\" lon=\"%f\">", position.latitude, position.longitude);
+            f.println(buf);
+            f.print("<time>"); f.print(timebuf); f.println("</time>");
+            f.println("<extensions><pvt:ext>");
+            sprintf(buf, "<pvt:dist>%d</pvt:dist>", code);
+            f.println(buf);
+            f.println("</pvt:ext></extensions>");
+            f.println("</trkpt>");
+        } else {
+            // CSV: write a full row but with event code as the distance field
+            saveCsv(f, (double)code);
+        }
+        f.flush();
+    }
+}
+
 // SignalK Support
 
 bool tState::signalk_parse_ws(String msg)

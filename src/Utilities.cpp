@@ -117,6 +117,7 @@ bool uploadFile(const char *sdPath)
     // 4. POST — blocking call
     HTTPClient http;
     http.begin(String(kServerBase) + "/upload");
+    http.setTimeout(30000);   // 30 s max — avoids infinite block when lwIP is busy
     http.addHeader("Content-Type",
                    String("multipart/form-data; boundary=") + boundary);
 

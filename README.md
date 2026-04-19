@@ -22,3 +22,7 @@ and the addres of the server.
 ## Changes for Wind branch
 
 1. Created new branch to record only data for the Wind Project
+2. Changed order of concepts so now Tab5Nav and Logbook record similar files (first fields)
+3. Added a Kalman Polar (Kalman 2D for vectors) for TWS / TWD to generate filtered TWS and TWD
+4. Added code to upload logs to server when stoping recording and when tapping in Logs window
+5. Added Auto Start and Auto Stop when moving and stopped more than some minutes

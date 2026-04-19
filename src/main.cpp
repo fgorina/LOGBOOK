@@ -404,9 +404,10 @@ void handleHelp()
   }
   SPIFFS.end();
 }
-bool handleFileRead(String path)
+bool handleFileRead(String spath)
 {
-
+  String path =  spath;
+  Serial.printf("Downloading %s\n", path.c_str());
   if (path.endsWith("/"))
   {
     path += "index.htm";
@@ -452,7 +453,7 @@ void handleFileList()
   server.sendContent("<a href=\"" + getFullUri("ask") + "\">Esborrar tots els Logs</a><br>\n");
   server.sendContent("<ul>\n");
 
-  File root = SD.open("/");
+  File root = SD.open("/logs");
   if (root.isDirectory())
   {
     File file = root.openNextFile();
@@ -1071,7 +1072,7 @@ void setup()
   }
 
   if(use0183){
-    xTaskCreate(nmea0183Task, "NMEA0183 Task",4000,NULL,0,&task0183);
+    xTaskCreate(nmea0183Task, "NMEA0183 Task",8192,NULL,0,&task0183);
     Serial.println("NMEA0183 Task Created");
   }
  

@@ -114,6 +114,18 @@ public:
     void saveGPXTrackpoint(File f, double distance);
     void saveGPXHeader(File f, char* name);
     void saveGPXFooter(File f);
+
+    // Connection event log (written by NetNMEA0183, consumed by RecordScreen)
+    // Codes: -1 watchdog (no valid data), -2 TCP drop / timeout, -3 reconnected
+    static const int CONN_EVENT_WATCHDOG   = -1;
+    static const int CONN_EVENT_TCP_DROP   = -2;
+    static const int CONN_EVENT_RECONNECT  = -3;
+    static const int MAX_CONN_EVENTS       =  8;
+    volatile int connEventQueue[MAX_CONN_EVENTS] = {};
+    volatile int connEventCount = 0;
+    void pushConnEvent(int code);
+    void flushConnEvents(File f, double distance, bool xmlFormat);
+
     bool signalk_parse_ws(String msg);
 };
 

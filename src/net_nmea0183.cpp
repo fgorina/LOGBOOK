@@ -14,9 +14,15 @@ void NetNMEA0183::run()
     if (WiFi.status() != WL_CONNECTED) return;
 
     if (!connected || !client.connected()) {
-        if (millis() - lastConnectAttempt > RETRY_MS) {
+        if (connected && !client.connected()) {
+            // TCP layer dropped the connection unexpectedly
+            Serial.println("NMEA0183: TCP connection lost");
+            state->pushConnEvent(tState::CONN_EVENT_TCP_DROP);
             disconnect();
-            connect();
+        }
+        if (millis() - lastConnectAttempt > RETRY_MS) {
+            if (connect())
+                state->pushConnEvent(tState::CONN_EVENT_RECONNECT);
         }
         return;
     }
@@ -35,19 +41,23 @@ void NetNMEA0183::run()
         lastActivity = millis();
     }
 
-    // Timeout check — server went silent
+    // Timeout check — server went silent at TCP level
     if (millis() - lastActivity > TIMEOUT_MS) {
         Serial.println("NMEA0183: timeout, reconnecting");
+        state->pushConnEvent(tState::CONN_EVENT_TCP_DROP);
         disconnect();
-        connect();
+        if (connect())
+            state->pushConnEvent(tState::CONN_EVENT_RECONNECT);
         return;
     }
 
-    // Watchdog — receiving bytes but no valid parsed sentence
+    // Watchdog — connected but no valid NMEA sentence received
     if (millis() - lastValidData > WATCHDOG_MS) {
         Serial.println("NMEA0183: watchdog, no valid data, reconnecting");
+        state->pushConnEvent(tState::CONN_EVENT_WATCHDOG);
         disconnect();
-        connect();
+        if (connect())
+            state->pushConnEvent(tState::CONN_EVENT_RECONNECT);
     }
 }
 
@@ -56,6 +66,7 @@ bool NetNMEA0183::connect()
     if (strlen(host) == 0 || port <= 0) return false;
     Serial.printf("NMEA0183: connecting to %s:%d\n", host, port);
     lastConnectAttempt = millis();
+    client.setTimeout(5);   // 5 s connect timeout — avoids blocking the task indefinitely
     if (client.connect(host, port)) {
         Serial.println("NMEA0183: connected");
         connected = true;
@@ -126,6 +137,9 @@ void NetNMEA0183::processLine(const char *line)
         return;
     }
 
+    // Any sentence with a valid checksum means the TCP link is alive.
+    lastValidData = millis();
+
     char buf[128];
     strncpy(buf, line, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
@@ -142,8 +156,6 @@ void NetNMEA0183::processLine(const char *line)
     // AIS sentences (VDM/VDO) — valid but not parsed here
     if (strcmp(type, "VDM") == 0 || strcmp(type, "VDO") == 0) return;
 
-    bool dispatched = false;
-
     // xMWV,<angle>,<ref>,<speed>,<unit>,<status>
     // ref: R=relative(apparent), T=true
     if (strcmp(type, "MWV") == 0 && n >= 6 && fields[5][0] == 'A') {
@@ -153,7 +165,6 @@ void NetNMEA0183::processLine(const char *line)
         if (fields[4][0] == 'K') speed /= 3.6f;        // km/h -> m/s
         else if (fields[4][0] == 'N') speed *= 0.514444f; // knots -> m/s
         state->onNMEA0183Wind(angle, speed, ref == 'R');
-        dispatched = true;
     }
     // xRMC,<time>,<status>,<lat>,<NS>,<lon>,<EW>,<sog>,<cog>,<date>,...
     else if (strcmp(type, "RMC") == 0 && n >= 10) {
@@ -171,33 +182,28 @@ void NetNMEA0183::processLine(const char *line)
             state->onNMEA0183Position(lat, lon);
             state->onNMEA0183SOGCOGTrue(sog, cog);
         }
-        dispatched = true;
     }
     // xGGA,<time>,<lat>,<NS>,<lon>,<EW>,<fix>,...
     else if (strcmp(type, "GGA") == 0 && n >= 7 && atoi(fields[6]) > 0) {
         float lat = parseDegMin(fields[2], fields[3][0]);
         float lon = parseDegMin(fields[4], fields[5][0]);
         state->onNMEA0183Position(lat, lon);
-        dispatched = true;
     }
     // xVTG,<cogT>,T,<cogM>,M,<sogN>,N,<sogK>,K,...
     else if (strcmp(type, "VTG") == 0 && n >= 7) {
         float cog = atof(fields[1]) * DEG_TO_RAD;
         float sog = atof(fields[5]) * 0.514444f; // knots -> m/s
         state->onNMEA0183SOGCOGTrue(sog, cog);
-        dispatched = true;
     }
     // xHDG,<mag>,<dev>,<devEW>,<var>,<varEW>
     else if (strcmp(type, "HDG") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingMagnetic(hdg);
-        dispatched = true;
     }
     // xHDT,<true>,T
     else if (strcmp(type, "HDT") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingTrue(hdg);
-        dispatched = true;
     }
     // xXDR,<type>,<value>,<unit>,<id>[,<type>,<value>,<unit>,<id>...]
     // Angular (A) transducers: HEEL/ROLL -> roll, PTCH/PITCH -> pitch (degrees)
@@ -214,13 +220,10 @@ void NetNMEA0183::processLine(const char *line)
             else if (strcasecmp(id, "PTCH") == 0 || strcasecmp(id, "PITCH") == 0)
                 pitch = val;
         }
-        if (!isnan(roll) || !isnan(pitch)) {
+        if (!isnan(roll) || !isnan(pitch))
             state->onNMEA0183Attitude(roll, pitch);
-            dispatched = true;
-        }
     } else {
         //Serial.printf("Unknown sequence %s\n", line);
     }
 
-    if (dispatched) lastValidData = millis();
 }
