@@ -65,9 +65,17 @@ void MenuScreen::draw()
 
     M5.Display.setFont(&fonts::FreeSans9pt7b);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-    M5.Display.setTextDatum(TC_DATUM);
-   // M5.Display.drawString(WiFi.localIP().toString(), width / 2, 10);
-    M5.Display.drawString(deviceName, width / 2, 10);
+
+    M5.Display.setTextDatum(TL_DATUM);
+    M5.Display.drawString(deviceName, 0, 10);
+
+    struct tm timeinfo = {};
+    if (getLocalTime(&timeinfo, 0)) {
+        char timebuf[6];
+        snprintf(timebuf, sizeof(timebuf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        M5.Display.setTextDatum(TR_DATUM);
+        M5.Display.drawString(timebuf, width, 10);
+    }
    if (brecord != nullptr && bfiles != nullptr && binspector != nullptr)
     {
         brecord->draw();

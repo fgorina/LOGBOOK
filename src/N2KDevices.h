@@ -1,10 +1,10 @@
 /* Screen Prototype */
 
-#ifndef _N2KDevices_H_
-#define _N2KDevices_H_
+#pragma once
 
 #include "Screen.h"
 #include "N2kDeviceList.h"
+#include <vector>
 
 #define HEADER_SIZE 30
 
@@ -19,11 +19,16 @@ public:
     int run(const m5::touch_detail_t &t) override;
 
 protected:
+    static const int FIRST_ROW = 40;
+    static const int ROW_DELTA = 30;
+
     Button *bexit = nullptr;
 
     tN2kDeviceList* deviceList;
     bool printDevices = false;
 
-};
+    std::vector<uint8_t> displayedSources;
 
-#endif
+    bool isListened(uint8_t src);
+    void toggleSource(uint8_t src);
+};

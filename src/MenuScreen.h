@@ -1,7 +1,6 @@
 /* Screen Prototype */
 
-#ifndef _MENUScreen_H_
-#define _MENUScreen_H_
+#pragma once
 #include "Screen.h"
 #include "State.h"
 
@@ -28,5 +27,3 @@ class MenuScreen : public Screen
 
 
 };
-
-#endif

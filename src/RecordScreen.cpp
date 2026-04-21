@@ -93,6 +93,20 @@ void RecordScreen::draw_data()
 
 }
 
+void RecordScreen::captureTime(struct tm &timeinfo)
+{
+    if (!getLocalTime(&timeinfo, 0)) {
+        auto rtcDate = M5.Rtc.getDate();
+        auto rtcTime = M5.Rtc.getTime();
+        timeinfo.tm_year  = rtcDate.year - 1900;
+        timeinfo.tm_mon   = rtcDate.month - 1;
+        timeinfo.tm_mday  = rtcDate.date;
+        timeinfo.tm_hour  = rtcTime.hours;
+        timeinfo.tm_min   = rtcTime.minutes;
+        timeinfo.tm_sec   = rtcTime.seconds;
+    }
+}
+
 int RecordScreen::run(const m5::touch_detail_t &t)
 {
     if (millis() - old_second_millis >= 1000){
@@ -101,13 +115,14 @@ int RecordScreen::run(const m5::touch_detail_t &t)
     }
     if (recording)
     {
-        
-        if (millis() - old_millis > period)
+         if (millis() - old_millis > period)
         {
             old_millis = millis();
+            struct tm timeinfo = {};
+            captureTime(timeinfo);
             double lat2 = state->position.latitude;
             double lon2 = state->position.longitude;
-            saveData(file);
+            saveData(file, timeinfo);
 
             // Update distance only if distance > 10m. Perhaps should be better
             // doing 20m. Depends GPS accuracy
@@ -118,8 +133,7 @@ int RecordScreen::run(const m5::touch_detail_t &t)
                 miles += distance;
                 old_lat = lat2;
                 old_lon = lon2;
-               
-            }
+             }
             draw_distance();
         }
     }
@@ -160,7 +174,9 @@ void RecordScreen::startRecord()
     newFilename(filename, LENNAME);
     file = SD.open(filename, FILE_WRITE);
     saveHeader(file, filename);
-    saveData(file);
+    struct tm timeinfo = {};
+    captureTime(timeinfo);
+    saveData(file, timeinfo);
     old_millis = millis();
 
     old_lat = state->position.latitude;
@@ -175,7 +191,9 @@ void RecordScreen::stopRecord()
     // Close file
     brecord->setLabel("Start");
 
-    saveData(file);
+    struct tm timeinfo = {};
+    captureTime(timeinfo);
+    saveData(file, timeinfo);
     saveFooter(file);
     file.flush();
     file.close();
@@ -319,7 +337,7 @@ void  RecordScreen::saveFooter(File f){
     }
 }
 
-void RecordScreen::saveData(File f){
+void RecordScreen::saveData(File f, const struct tm &timeinfo){
     // Flush any pending connection events before the normal data row
     state->flushConnEvents(f, miles, xmlFormat);
 
@@ -327,10 +345,10 @@ void RecordScreen::saveData(File f){
     bool doflush = rows_not_saved >= max_rows_not_saved;
 
     if(xmlFormat){
-        state->saveGPXTrackpoint(f, miles);
+        state->saveGPXTrackpoint(f, miles, timeinfo);
         if(doflush)f.flush();
     }else{
-        state->saveCsv(f, miles);
+        state->saveCsv(f, miles, timeinfo);
         if(doflush)f.flush();
     }
     if(doflush) rows_not_saved = 0;

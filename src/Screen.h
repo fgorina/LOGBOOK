@@ -25,8 +25,7 @@
 
 */
 
-#ifndef _Screen_H_
-#define _Screen_H_
+#pragma once
 
 #include "M5Button.h"
 #include <M5Unified.h>
@@ -45,5 +44,3 @@ public:
   virtual void draw();
   virtual int run(const m5::touch_detail_t &t);
 };
-
-#endif

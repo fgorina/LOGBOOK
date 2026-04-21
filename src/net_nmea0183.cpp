@@ -157,15 +157,25 @@ void NetNMEA0183::processLine(const char *line)
     if (strcmp(type, "VDM") == 0 || strcmp(type, "VDO") == 0) return;
 
     // xMWV,<angle>,<ref>,<speed>,<unit>,<status>
-    // ref: R=relative(apparent), T=true
+    // ref: R=relative(apparent) T is ignored, not clrar
     if (strcmp(type, "MWV") == 0 && n >= 6 && fields[5][0] == 'A') {
         float angle = atof(fields[1]) * DEG_TO_RAD;
         char  ref   = fields[2][0];
+        if (ref != 'R' ) return;
         float speed = atof(fields[3]);
         if (fields[4][0] == 'K') speed /= 3.6f;        // km/h -> m/s
         else if (fields[4][0] == 'N') speed *= 0.514444f; // knots -> m/s
-        state->onNMEA0183Wind(angle, speed, ref == 'R');
+        state->onNMEA0183Wind(angle, speed, true);
     }
+    // MWD — true wind, north-referenced, no ambiguity
+
+    else if (strcmp(type, "MWD") == 0 && n >= 8 && fields[7][0] == 'A') {
+        float angle = atof(fields[1]) * DEG_TO_RAD;  // field 1 = True degrees
+        float speed = atof(fields[5]);                // field 5 = knots
+        speed *= 0.514444f;                           // knots -> m/s
+        state->onNMEA0183Wind(angle, speed, false);   // apparent=false, north-ref
+    }
+
     // xRMC,<time>,<status>,<lat>,<NS>,<lon>,<EW>,<sog>,<cog>,<date>,...
     else if (strcmp(type, "RMC") == 0 && n >= 10) {
         // Time/date are valid even before the GPS has a position fix (status 'V'),
@@ -183,28 +193,33 @@ void NetNMEA0183::processLine(const char *line)
             state->onNMEA0183SOGCOGTrue(sog, cog);
         }
     }
+
     // xGGA,<time>,<lat>,<NS>,<lon>,<EW>,<fix>,...
     else if (strcmp(type, "GGA") == 0 && n >= 7 && atoi(fields[6]) > 0) {
         float lat = parseDegMin(fields[2], fields[3][0]);
         float lon = parseDegMin(fields[4], fields[5][0]);
         state->onNMEA0183Position(lat, lon);
     }
+
     // xVTG,<cogT>,T,<cogM>,M,<sogN>,N,<sogK>,K,...
     else if (strcmp(type, "VTG") == 0 && n >= 7) {
         float cog = atof(fields[1]) * DEG_TO_RAD;
         float sog = atof(fields[5]) * 0.514444f; // knots -> m/s
         state->onNMEA0183SOGCOGTrue(sog, cog);
     }
+
     // xHDG,<mag>,<dev>,<devEW>,<var>,<varEW>
     else if (strcmp(type, "HDG") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingMagnetic(hdg);
     }
+
     // xHDT,<true>,T
     else if (strcmp(type, "HDT") == 0 && n >= 2) {
         float hdg = atof(fields[1]) * DEG_TO_RAD;
         state->onNMEA0183HeadingTrue(hdg);
     }
+    
     // xXDR,<type>,<value>,<unit>,<id>[,<type>,<value>,<unit>,<id>...]
     // Angular (A) transducers: HEEL/ROLL -> roll, PTCH/PITCH -> pitch (degrees)
     else if (strcmp(type, "XDR") == 0 && n >= 5) {

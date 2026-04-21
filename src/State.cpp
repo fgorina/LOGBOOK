@@ -91,7 +91,7 @@ bool tState::ParseN2kPGN129285(const tN2kMsg &N2kMsg, uint16_t &Start, uint16_t 
   c = N2kMsg.GetByte(index);
   // Use flags to set values
   SupplementaryData = tN2kGenericStatusPair((c & 0x18) >> 3);
-  NavDirection = tN2kNavigationDirection(c && 0x07);
+  NavDirection = tN2kNavigationDirection(c & 0x07);
   N2kMsg.GetVarStr(RouteNameBufSize, RouteName, index);
   c = N2kMsg.GetByte(index); // Reserved
 
@@ -465,7 +465,7 @@ void tState::handleWind(const tN2kMsg &N2kMsg)
     trueWind.reference = windReference;
     trueWind.angle = windAngle;
     trueWind.speed = windSpeed;
-    runWindFilter((uint64_t)millis());
+    //runWindFilter((uint64_t)millis());
   }
 
   if (!verbose)
@@ -895,21 +895,9 @@ void tState::tState::printInfo()
 // All values in SI — no unit conversions.
 // distance parameter is in NM (from RecordScreen), converted here to metres.
 
-void tState::saveCsv(File f, double distance)
+void tState::saveCsv(File f, double distance, const struct tm &timeinfo)
 {
   char timebuf[32];
-  struct tm timeinfo = {};
-  if (!getLocalTime(&timeinfo, 0)) {
-    // System clock not synced — fall back to RTC
-    auto rtcDate = M5.Rtc.getDate();
-    auto rtcTime = M5.Rtc.getTime();
-    timeinfo.tm_year  = rtcDate.year - 1900;
-    timeinfo.tm_mon   = rtcDate.month - 1;
-    timeinfo.tm_mday  = rtcDate.date;
-    timeinfo.tm_hour  = rtcTime.hours;
-    timeinfo.tm_min   = rtcTime.minutes;
-    timeinfo.tm_sec   = rtcTime.seconds;
-  }
   strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
 
   // time, distance(m)
@@ -948,8 +936,10 @@ void tState::saveCsv(File f, double distance)
   f.print('\t'); f.print(engineTemperature.value,  2);
 
   // TWD(rad), TWS(m/s) — Kalman-filtered
-  f.print('\t'); f.print(filteredTrueWind.angle, 6);
-  f.print('\t'); f.print(filteredTrueWind.speed, 6);
+  //f.print('\t'); f.print(filteredTrueWind.angle, 6);
+  //f.print('\t'); f.print(filteredTrueWind.speed, 6);
+  f.print('\t'); f.print(trueWind.angle, 6);
+  f.print('\t'); f.print(trueWind.speed, 6);
 
   // Placeholder columns (not computed here)
   f.print("\t0\t0\t0\t0\t0\t0");
@@ -973,21 +963,9 @@ void tState::saveCsvHeader(File f)
 
 // Export an extended trakpt. There are a lot of particular extensions
 
-void tState::saveGPXTrackpoint(File f, double distance)
+void tState::saveGPXTrackpoint(File f, double distance, const struct tm &timeinfo)
 {
   char buffer[100];
-  struct tm timeinfo = {};
-
-  if (!getLocalTime(&timeinfo, 0)) {
-    auto rtcDate = M5.Rtc.getDate();
-    auto rtcTime = M5.Rtc.getTime();
-    timeinfo.tm_year  = rtcDate.year - 1900;
-    timeinfo.tm_mon   = rtcDate.month - 1;
-    timeinfo.tm_mday  = rtcDate.date;
-    timeinfo.tm_hour  = rtcTime.hours;
-    timeinfo.tm_min   = rtcTime.minutes;
-    timeinfo.tm_sec   = rtcTime.seconds;
-  }
 
   sprintf(buffer, "<trkpt lat=\"%f\" lon=\"%f\">", position.latitude, position.longitude);
   f.println(buffer);
@@ -1111,7 +1089,14 @@ void tState::flushConnEvents(File f, double distance, bool xmlFormat)
             f.println("</trkpt>");
         } else {
             // CSV: write a full row but with event code as the distance field
-            saveCsv(f, (double)code);
+            struct tm evtTime = {};
+            if (!getLocalTime(&evtTime, 0)) {
+                auto d = M5.Rtc.getDate(); auto t = M5.Rtc.getTime();
+                evtTime.tm_year = d.year-1900; evtTime.tm_mon = d.month-1;
+                evtTime.tm_mday = d.date;
+                evtTime.tm_hour = t.hours; evtTime.tm_min = t.minutes; evtTime.tm_sec = t.seconds;
+            }
+            saveCsv(f, (double)code, evtTime);
         }
         f.flush();
     }
@@ -1274,7 +1259,7 @@ void tState::onNMEA0183Wind(float angleRad, float speedMs, bool apparent)
     trueWind.reference = tN2kWindReference::N2kWind_True_North;
     if (!isnan(angleRad)) trueWind.angle = angleRad;
     if (!isnan(speedMs))  trueWind.speed = speedMs;
-    runWindFilter((uint64_t)millis());
+    //runWindFilter((uint64_t)millis());
   }
 }
 

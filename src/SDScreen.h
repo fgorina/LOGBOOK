@@ -1,7 +1,6 @@
 /* Screen Prototype */
 
-#ifndef _SDScreen_H_
-#define _SDScreen_H_
+#pragma once
 
 #include "Screen.h"
 #include "State.h"
@@ -42,5 +41,3 @@ class SDScreen : public Screen
 
 
 };
-
-#endif

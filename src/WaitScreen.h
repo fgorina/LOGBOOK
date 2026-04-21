@@ -1,7 +1,6 @@
 /* Screen Prototype */
 
-#ifndef _WaitScreen_H_
-#define _Waitcreen_H_
+#pragma once
 
 #include "Screen.h"
 
@@ -22,6 +21,4 @@ class WaitScreen : public Screen
 
 
 };
-
-#endif
 

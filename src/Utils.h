@@ -1,5 +1,4 @@
-#ifndef __UTILS__
-#define __UTILS__
+#pragma once
 
 String join(int *data, int n, char sep)
 {
@@ -83,5 +82,3 @@ void testSplitter()
 
     Serial.println("====================================");
 }
-
-#endif

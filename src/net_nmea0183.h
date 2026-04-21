@@ -1,5 +1,4 @@
-#ifndef NET_NMEA0183_H
-#define NET_NMEA0183_H
+#pragma once
 
 #include <Arduino.h>
 #include <WiFiClient.h>
@@ -34,5 +33,3 @@ private:
     void processLine(const char *line);
     bool validChecksum(const char *line);
 };
-
-#endif

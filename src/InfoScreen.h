@@ -1,7 +1,6 @@
 /* Screen Prototype */
 
-#ifndef _InfoScreen_H_
-#define _InfoScreen_H_
+#pragma once
 
 #include "Screen.h"
 
@@ -35,5 +34,3 @@ protected:
     String* sources;
 
 };
-
-#endif

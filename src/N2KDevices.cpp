@@ -6,6 +6,7 @@
 
 extern int sources[MAX_SOURCES];
 extern int n_sources;
+extern void writePreferences();
 
 N2KDevices::N2KDevices(tN2kDeviceList *deviceList, int width, int height,
                        const char *title)
@@ -39,48 +40,74 @@ void N2KDevices::exit() {
 }
 
 void N2KDevices::draw() {
-  int pos = 40;
-  int delta = 30;
+  int pos = FIRST_ROW;
 
   M5.Display.setFont(&fonts::FreeSans9pt7b);
   Serial.println("N2KDevices::draw");
   M5.Display.clear();
 
   M5.Display.setTextDatum(TC_DATUM);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Display.drawString("Devices", width / 2, 10);
 
   M5.Display.setTextDatum(BL_DATUM);
+  displayedSources.clear();
 
-  if (deviceList) {
+  if (deviceList && printDevices) {
+    for (uint8_t i = 0; i < N2kMaxBusDevices; i++) {
+      tNMEA2000::tDevice *pDevice =
+          ((tNMEA2000::tDevice *)deviceList->FindDeviceBySource(i));
 
-    Serial.println("Devices " + N2kMaxBusDevices);
+      if (pDevice != nullptr && pos < height - 40) {
+        uint8_t src = pDevice->GetSource();
+        displayedSources.push_back(src);
 
-    if (printDevices) {
-      for (uint8_t i = 0; i < N2kMaxBusDevices; i++) {
-
-        Serial.println("Device " + i);
-
-        tNMEA2000::tDevice *pDevice =
-            ((tNMEA2000::tDevice *)deviceList->FindDeviceBySource(i));
-
-        if (pDevice != 0) {
-
-          if (pos < height) {
-            M5.Display.drawString(String(pDevice->GetSource()), 10, pos);
-            M5.Display.drawString(pDevice->GetModelID(), 100, pos += delta);
-          }
-        }
+        uint16_t color = isListened(src) ? TFT_CYAN : TFT_WHITE;
+        M5.Display.setTextColor(color, TFT_BLACK);
+        M5.Display.drawString(String(src), 10, pos);
+        M5.Display.drawString(pDevice->GetModelID(), 60, pos);
+        pos += ROW_DELTA;
       }
     }
   }
 
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Display.setTextDatum(CC_DATUM);
   bexit->draw();
+}
+
+bool N2KDevices::isListened(uint8_t src) {
+  for (int i = 0; i < n_sources; i++)
+    if (sources[i] == src) return true;
+  return false;
+}
+
+void N2KDevices::toggleSource(uint8_t src) {
+  for (int i = 0; i < n_sources; i++) {
+    if (sources[i] == (int)src) {
+      for (int j = i; j < n_sources - 1; j++) sources[j] = sources[j + 1];
+      sources[--n_sources] = -1;
+      writePreferences();
+      return;
+    }
+  }
+  if (n_sources < MAX_SOURCES) {
+    sources[n_sources++] = src;
+    writePreferences();
+  }
 }
 
 int N2KDevices::run(const m5::touch_detail_t &t) {
   if (bexit != nullptr && bexit->handleTouch(t)) {
     return (0);
+  }
+
+  if (t.wasClicked()) {
+    int row = (t.y - FIRST_ROW + ROW_DELTA) / ROW_DELTA - 1;
+    if (row >= 0 && row < (int)displayedSources.size()) {
+      toggleSource(displayedSources[row]);
+      draw();
+    }
   }
 
   if (deviceList && deviceList->ReadResetIsListUpdated()) {

@@ -3,8 +3,7 @@
    Replaces the Button class from M5Tough which does not exist in M5Unified.
 */
 
-#ifndef _M5BUTTON_H_
-#define _M5BUTTON_H_
+#pragma once
 
 #include <M5Unified.h>
 
@@ -120,5 +119,3 @@ public:
         return false;
     }
 };
-
-#endif

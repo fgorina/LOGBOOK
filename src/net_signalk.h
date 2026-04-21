@@ -1,5 +1,4 @@
-#ifndef NET_SIGNALK_WS_H
-#define NET_SIGNALK_WS_H
+#pragma once
 #include <Arduino.h>
 #include <ArduinoWebsockets.h>
 #include "State.h"
@@ -30,5 +29,3 @@ public:
   void begin();
   void run();
 };
-
-#endif

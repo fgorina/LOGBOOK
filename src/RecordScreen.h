@@ -1,5 +1,4 @@
-#ifndef _RecordScreen_H_
-#define _RecordScreen_H_
+#pragma once
 
 
 #include "Screen.h"
@@ -54,7 +53,8 @@ class RecordScreen : public Screen
     void newFilename(char* buff, int maxbuff);
     void duration(char* buff, int bufsize);   
     void distance(char* buff, int bufsize);
-    void saveData(File f);
+    void captureTime(struct tm &timeinfo);
+    void saveData(File f, const struct tm &timeinfo);
     void  saveHeader(File f, char* name);
     void  saveFooter(File f);
     double haversine(double lat1, double lon1, double lat2, double lon2);   // Distances lox in Nm
@@ -73,5 +73,3 @@ class RecordScreen : public Screen
 
     void updateMovingFilter();
 };
-
-#endif
