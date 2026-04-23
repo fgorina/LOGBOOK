@@ -786,7 +786,7 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
   this->verbose = verbose;
 
   if (!(N2kMsg.Source == 15 ||
-      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312 || N2kMsg.PGN == 127245)))){
+      (N2kMsg.Source == 100 && (N2kMsg.PGN == 127489 ||N2kMsg.PGN == 127488 ||N2kMsg.PGN == 128267 || N2kMsg.PGN == 130312 || N2kMsg.PGN == 130314 || N2kMsg.PGN == 127245)))){
         return;
       }
   switch (N2kMsg.PGN)
