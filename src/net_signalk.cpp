@@ -112,7 +112,8 @@ void NetSignalkWS::subscribe()
                        "{\"path\": \"navigation.headingTrue\", \"policy\":\"instant\"},"
                        "{\"path\": \"navigation.position\", \"policy\":\"instant\"},"
                        "{\"path\": \"navigation.speedOverGround\", \"policy\":\"instant\"},"
-                       "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"}"
+                       "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"},"
+                       "{\"path\": \"environment.outside.pressure\", \"policy\":\"instant\"}"
                        "]}\n";
     client->send(data);
     Serial.println("Sent Subscribe");

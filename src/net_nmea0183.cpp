@@ -237,7 +237,15 @@ void NetNMEA0183::processLine(const char *line)
         }
         if (!isnan(roll) || !isnan(pitch))
             state->onNMEA0183Attitude(roll, pitch);
-    } else {
+    }
+    // xMMB,<inHg>,I,<bars>,B
+    else if (strcmp(type, "MMB") == 0 && n >= 4) {
+        float bars = atof(fields[3]);
+        if (bars > 0.0f)
+            state->onNMEA0183Pressure(bars * 100000.0f);  // bar -> Pa
+    }
+
+    else {
         //Serial.printf("Unknown sequence %s\n", line);
     }
 

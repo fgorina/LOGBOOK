@@ -36,6 +36,7 @@ protected:
     void handleRudderCommand(const tN2kMsg &N2kMsg);
     void handleDepth(const tN2kMsg &N2kMsg);
     void handleTemperature(const tN2kMsg &N2kMsg);
+    void handlePressure(const tN2kMsg &N2kMsg);
     void handleHeading(const tN2kMsg &N2kMsg);
     void handleRateOfTurn(const tN2kMsg &N2kMsg);
     void handleAttitude(const tN2kMsg &N2kMsg);
@@ -61,6 +62,7 @@ public:
     void onNMEA0183HeadingTrue(float hdgRad);
     void onNMEA0183DateTime(const char *hhmmss, const char *ddmmyy);
     void onNMEA0183Attitude(float rollRad, float pitchRad);
+    void onNMEA0183Pressure(float pressurePa);
     int displaySaver = DISPLAY_ACTIVE;
 
     tHeadingData cog{.when = 0, .origin = 0, .reference = tN2kHeadingReference::N2khr_Unavailable, .heading = 0.0};
@@ -86,6 +88,7 @@ public:
     tDoubleData rpm{.when = 0, .origin = 0, .value = 0.0}; // RPM
     tDoubleData engineTemperature{.when = 0, .origin = 0, .value = 0.0}; // Engine Temperature
     tDoubleData oilPressure{.when = 0, .origin = 0, .value = 0.0}; // Engine Temperature
+    tDoubleData atmosphericPressure{.when = 0, .origin = 0, .value = 0.0}; // Pa — environment.outside.pressure
 
 
     // RW , Commands and data - Not used for the moment

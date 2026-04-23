@@ -271,6 +271,22 @@ void tState::handleTemperature(const tN2kMsg &N2kMsg){
 
 }
 
+void tState::handlePressure(const tN2kMsg &N2kMsg)
+{
+  unsigned char SID;
+  unsigned char PressureInstance;
+  tN2kPressureSource PressureSource;
+  double Pressure;
+
+  if (ParseN2kPressure(N2kMsg, SID, PressureInstance, PressureSource, Pressure)) {
+    if (PressureSource == N2kps_Atmospheric && Pressure != N2kDoubleNA) {
+      atmosphericPressure.when   = time(nullptr);
+      atmosphericPressure.origin = N2kMsg.Source;
+      atmosphericPressure.value  = Pressure;
+    }
+  }
+}
+
 // Rudder command is not used for the moment
 void tState::handleRudderCommand(const tN2kMsg &N2kMsg)
 {
@@ -852,6 +868,10 @@ void tState::HandleNMEA2000Msg(const tN2kMsg &N2kMsg, bool analyze, bool verbose
     handleTemperature(N2kMsg);
     break;
 
+  case 130314:
+    handlePressure(N2kMsg);
+    break;
+
   default:
     if (analyze)
     {
@@ -941,8 +961,11 @@ void tState::saveCsv(File f, double distance, const struct tm &timeinfo)
   f.print('\t'); f.print(trueWind.angle, 6);
   f.print('\t'); f.print(trueWind.speed, 6);
 
+  // PRES(Pa) — atmospheric pressure
+  f.print('\t'); f.print(atmosphericPressure.value, 1);
+
   // Placeholder columns (not computed here)
-  f.print("\t0\t0\t0\t0\t0\t0");
+  f.print("\t0\t0\t0\t0\t0");
 
   f.println();
 }
@@ -958,7 +981,8 @@ void tState::saveCsvHeader(File f)
             "\tTWD_raw\tTWS_raw"
             "\tDPT\tRPM\tEngTw"
             "\tTWD\tTWS"
-            "\tWind\tGust\tAWA\tAWS\tOM_grade\tENV_grade");
+            "\tPRES"
+            "\tWind\tGust\tAWA\tAWS\tOM_grade");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions
@@ -1242,6 +1266,9 @@ void tState::onSignalKDelta(const char *path, JsonVariantConst value)
       }
     }
   }
+  else if (strcmp(path, "environment.outside.pressure") == 0 && value.is<float>()) {
+    atmosphericPressure = {now, -1, value.as<float>()};
+  }
 }
 
 // NMEA 0183 over WiFi
@@ -1343,6 +1370,13 @@ void tState::onNMEA0183Attitude(float rollRad, float pitchRad)
   attitude.origin = -2;  // NMEA0183 source
   if (!isnan(rollRad))  attitude.roll  = rollRad;
   if (!isnan(pitchRad)) attitude.pitch = pitchRad;
+}
+
+void tState::onNMEA0183Pressure(float pressurePa)
+{
+  atmosphericPressure.when   = time(nullptr);
+  atmosphericPressure.origin = -2;  // NMEA0183 source
+  atmosphericPressure.value  = pressurePa;
 }
 
 /* Signal K Parsing */
