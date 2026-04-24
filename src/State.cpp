@@ -981,7 +981,7 @@ void tState::saveCsvHeader(File f)
             "\tTWD_raw\tTWS_raw"
             "\tDPT\tRPM\tEngTw"
             "\tTWD\tTWS"
-            "\tPRES"
+            "\BARO_raw"
             "\tWind\tGust\tAWA\tAWS\tOM_grade");
 }
 
