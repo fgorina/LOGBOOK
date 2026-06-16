@@ -79,6 +79,8 @@ void RecordScreen::draw_distance()
 
     snprintf(buffer, MAXBUFFER, "AWS %03.1f kt", state->apparentWind.speed * 3600.0 / 1852.0);
     M5.Display.drawString(buffer, 19, 155);
+    snprintf(buffer, MAXBUFFER, "Eng T  %03.1f ºC", state->engineTemperature.value-273.15);
+    M5.Display.drawString(buffer, 19, 155);
 }
 
 void RecordScreen::draw_data()

@@ -264,7 +264,7 @@ void tState::handleTemperature(const tN2kMsg &N2kMsg){
 
   ParseN2kTemperature(N2kMsg, SID, TempInstance, TempSource, ActualTemperature, SetTemperature);
 
-  
+  return;
   engineTemperature.when = time(nullptr);
   engineTemperature.origin = N2kMsg.Source;
   engineTemperature.value = ActualTemperature;
@@ -756,6 +756,8 @@ int8_t EngineTorque;
   engineTemperature.when = time(nullptr);
   engineTemperature.origin = N2kMsg.Source;
   engineTemperature.value = EngineCoolantTemp;
+  Serial.print("Engine Temp: ");
+  Serial.println(EngineCoolantTemp);
  
 } 
 
