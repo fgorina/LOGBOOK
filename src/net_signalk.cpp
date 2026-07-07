@@ -113,6 +113,9 @@ void NetSignalkWS::subscribe()
                        "{\"path\": \"navigation.position\", \"policy\":\"instant\"},"
                        "{\"path\": \"navigation.speedOverGround\", \"policy\":\"instant\"},"
                        "{\"path\": \"navigation.courseOverGroundTrue\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.rateOfTurn\", \"policy\":\"instant\"},"
+                       "{\"path\": \"navigation.attitude\", \"policy\":\"instant\"},"
+                       "{\"path\": \"steering.rudderAngle\", \"policy\":\"instant\"},"
                        "{\"path\": \"environment.outside.pressure\", \"policy\":\"instant\"}"
                        "]}\n";
     client->send(data);

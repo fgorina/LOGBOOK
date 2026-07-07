@@ -1,8 +1,8 @@
 #define TFT_HOR_RES 320
 #define TFT_VER_RES 240
 
-#define ESP32_CAN_TX_PIN GPIO_NUM_19
-#define ESP32_CAN_RX_PIN GPIO_NUM_27
+#define ESP32_CAN_TX_PIN GPIO_NUM_17
+#define ESP32_CAN_RX_PIN GPIO_NUM_18
 
 #include "N2kDeviceList.h"
 #include "esp_task_wdt.h"
@@ -12,8 +12,8 @@
 #include <ArduinoWebsockets.h>
 #include <M5Unified.h>
 #include <N2kMessages.h>
-#include <NMEA2000_CAN.h>
-#include <NMEA2000_esp32.h>
+#include "NMEA2000_twai.h"
+tNMEA2000 &NMEA2000 = *(new tNMEA2000_twai(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN));
 #include <Preferences.h>
 #include <WebServer.h>
 #include <time.h>
@@ -981,9 +981,10 @@ void splash() {
 void setup() {
 
   M5.begin();
-  M5.Display.setRotation(3); // 3 per la versio NMEA 2000
+  M5.Display.setRotation(1); // 3 per la versio NMEA 2000 del M5Though, 1 for the rest
   Serial.begin(115200);
   M5.Display.wakeup();
+
   readPreferences();
   if (!wifi_ssid.isEmpty()) {
     splash();
@@ -995,8 +996,8 @@ void setup() {
   M5.Display.setTextSize(1.0);
   sdMutex = xSemaphoreCreateMutex();
 
-  // Core2: SD uses VSPI, CS=GPIO4, CLK=GPIO18, MISO=GPIO38, MOSI=GPIO23
-  SPI.begin(18, 38, 23, 4);
+  // CoreS3 SE: SCK=G36, MISO=G35, MOSI=G37, CS=G4
+  SPI.begin(36, 35, 37, 4);
   if (!SD.begin(4, SPI, 25000000)) {
     Serial.println("SD card mount failed");
   } else {
