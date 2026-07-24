@@ -1,4 +1,5 @@
 #include "NMEA2000_twai.h"
+#include "TwaiLog.h"
 #include <string.h>
 
 tNMEA2000_twai::tNMEA2000_twai(gpio_num_t txPin, gpio_num_t rxPin)
@@ -12,7 +13,11 @@ void tNMEA2000_twai::InitCANFrameBuffers() {
 }
 
 bool tNMEA2000_twai::CANOpen() {
-  if (_isOpen) return true;
+  TwaiLogger.printf("tNMEA2000_twai::CANOpen called, txPin=%d rxPin=%d\n", _txPin, _rxPin);
+  if (_isOpen) {
+    TwaiLogger.println("tNMEA2000_twai::CANOpen: already open");
+    return true;
+  }
 
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(_txPin, _rxPin, TWAI_MODE_NORMAL);
   g_config.rx_queue_len = 50;
@@ -21,14 +26,35 @@ bool tNMEA2000_twai::CANOpen() {
   twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
-  if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) return false;
-  if (twai_start() != ESP_OK) {
+  esp_err_t installErr = twai_driver_install(&g_config, &t_config, &f_config);
+  TwaiLogger.printf("tNMEA2000_twai::CANOpen: twai_driver_install=%d\n", installErr);
+  if (installErr != ESP_OK) return false;
+
+  esp_err_t startErr = twai_start();
+  TwaiLogger.printf("tNMEA2000_twai::CANOpen: twai_start=%d\n", startErr);
+  if (startErr != ESP_OK) {
     twai_driver_uninstall();
     return false;
   }
 
   _isOpen = true;
+  TwaiLogger.println("tNMEA2000_twai::CANOpen: success");
   return true;
+}
+
+void tNMEA2000_twai::RecoverFromBusOff(twai_state_t state) {
+  // Bus-off doesn't clear itself: the driver requires an explicit
+  // twai_initiate_recovery(), which (once 128 occurrences of 11 consecutive
+  // recessive bits are observed) drops the controller to STOPPED - it then
+  // requires an explicit twai_start() to resume normal operation. Without
+  // this, a single bus-off is permanent for the rest of the boot.
+  if (state == TWAI_STATE_BUS_OFF) {
+    TwaiLogger.println("TWAI bus-off - initiating recovery");
+    twai_initiate_recovery();
+  } else if (state == TWAI_STATE_STOPPED) {
+    TwaiLogger.println("TWAI recovered from bus-off - restarting");
+    twai_start();
+  }
 }
 
 bool tNMEA2000_twai::CANSendFrame(unsigned long id, unsigned char len, const unsigned char *buf, bool wait_sent) {
@@ -37,7 +63,16 @@ bool tNMEA2000_twai::CANSendFrame(unsigned long id, unsigned char len, const uns
   msg.data_length_code = len > 8 ? 8 : len;
   msg.extd = 1;
   memcpy(msg.data, buf, msg.data_length_code);
-  return twai_transmit(&msg, wait_sent ? portMAX_DELAY : 0) == ESP_OK;
+  esp_err_t err = twai_transmit(&msg, wait_sent ? portMAX_DELAY : 0);
+  if (err != ESP_OK) {
+    twai_status_info_t status;
+    twai_get_status_info(&status);
+    TwaiLogger.printf("twai_transmit failed: err=%d state=%d tec=%u rec=%u tx_failed=%u bus_err=%u arb_lost=%u\n",
+                  err, status.state, status.tx_error_counter, status.rx_error_counter,
+                  status.tx_failed_count, status.bus_error_count, status.arb_lost_count);
+    RecoverFromBusOff(status.state);
+  }
+  return err == ESP_OK;
 }
 
 bool tNMEA2000_twai::CANGetFrame(unsigned long &id, unsigned char &len, unsigned char *buf) {

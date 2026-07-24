@@ -24,4 +24,6 @@ private:
   gpio_num_t _txPin;
   gpio_num_t _rxPin;
   bool _isOpen;
+
+  void RecoverFromBusOff(twai_state_t state);
 };

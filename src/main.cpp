@@ -13,6 +13,7 @@
 #include <M5Unified.h>
 #include <N2kMessages.h>
 #include "NMEA2000_twai.h"
+#include "TwaiLog.h"
 tNMEA2000 &NMEA2000 = *(new tNMEA2000_twai(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN));
 #include <Preferences.h>
 #include <WebServer.h>
@@ -776,7 +777,7 @@ void setup_NMEA2000() {
       LogIndustryGroup     // Industry Group
   );
 
-  NMEA2000.SetForwardStream(&Serial);
+  NMEA2000.SetForwardStream(&TwaiLogger);
   NMEA2000.SetForwardType(
       tNMEA2000::fwdt_Text); // Show in clear text. Leave uncommented for
                              // default Actisense format.
@@ -1005,6 +1006,7 @@ void setup() {
   }
 
   if (useN2k) {
+    // TwaiLogger.begin(); // TWAI confirmed working, logging disabled
     setup_NMEA2000();
   }
 
