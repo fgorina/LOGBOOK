@@ -165,6 +165,9 @@ void RecordScreen::startRecord()
     brecord->off = selected_clrs;
     draw();
     recording = true;
+    // Freeze the clock for the whole recording: the GPS time sync steps the
+    // system clock every second, which made log timestamps non-monotonic.
+    state->clockFrozen = true;
     start_millis = millis();
     start_time = time(nullptr);
     miles = 0.0;
@@ -207,6 +210,8 @@ void RecordScreen::stopRecord()
     }
     file = File();
     recording = false;
+    // Resume normal GPS time sync now that we are no longer logging.
+    state->clockFrozen = false;
 }
 
 size_t RecordScreen::compressFile( const String &inputFilename)

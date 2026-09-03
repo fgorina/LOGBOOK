@@ -11,16 +11,36 @@
 extern int sources[MAX_SOURCES];
 extern int n_sources;
 
-// Given a time_t updates the RTC
+// Given GPS time (seconds since epoch, may carry a fraction) updates the RTC
+// and the POSIX system clock.
+//
+// Two guards keep log timestamps monotonic:
+//  - clockFrozen: while a recording is active the clock is left free-running on
+//    the ESP32 crystal (~2-3 s/day drift) instead of being stepped every second.
+//  - the 2 s threshold: outside a recording, small corrections are ignored so the
+//    clock is not repeatedly snapped back to the start of the current second
+//    (which produced a sawtooth and non-monotonic timestamps).
 
-void tState::setupTime(time_t t)
+void tState::setupTime(double t)
 {
+  if (clockFrozen)
+    return;
+
+  if (timeSet) {
+    struct timeval now;
+    gettimeofday(&now, nullptr);
+    double cur = now.tv_sec + now.tv_usec / 1e6;
+    if (fabs(t - cur) < 2.0)
+      return;
+  }
+
+  time_t whole = (time_t)t;
 
   struct tm *tm;
   m5::rtc_time_t RTCtime;
   m5::rtc_date_t RTCDate;
 
-  tm = localtime(&t);
+  tm = localtime(&whole);
 
   RTCtime.hours = tm->tm_hour;
   RTCtime.minutes = tm->tm_min;
@@ -32,8 +52,10 @@ void tState::setupTime(time_t t)
   RTCDate.date = tm->tm_mday;
   M5.Rtc.setDate(RTCDate);
 
-  // Also sync the POSIX system clock so getLocalTime() works correctly
-  struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
+  // Also sync the POSIX system clock so getLocalTime() works correctly.
+  // Keep the fractional second so the clock is not biased backwards by up to 1 s.
+  struct timeval tv = { .tv_sec = whole,
+                        .tv_usec = (suseconds_t)((t - (double)whole) * 1e6) };
   settimeofday(&tv, nullptr);
 
   timeSet = true;
@@ -136,7 +158,7 @@ void tState::handleSystemDateTime(const tN2kMsg &N2kMsg)
 
   // Compute the tiome since epoch
 
-  time_t now = SystemTime + (SystemDate * 86400);
+  double now = SystemTime + (SystemDate * 86400.0);
   setupTime(now);
 }
 
@@ -706,8 +728,9 @@ void tState::handleGNSS(const tN2kMsg &N2kMsg)
                nReferenceStations, ReferenceStationType, ReferenceSationID,
                AgeOfCorrection);
 
-  time_t now = SecondsSinceMidnight + (DaysSince1970 * 86400);
-  setupTime(now); // Update local clock with GNSS time
+  double nowSecs = SecondsSinceMidnight + (DaysSince1970 * 86400.0);
+  time_t now = (time_t)nowSecs;
+  setupTime(nowSecs); // Update local clock with GNSS time
 
   position.when = now;
   position.origin = N2kMsg.Source;

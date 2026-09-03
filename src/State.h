@@ -25,7 +25,7 @@ protected:
 
 
 
-    void setupTime(time_t t);
+    void setupTime(double t);
     void setupTimeSK(String datetime);
     void handleSystemDateTime(const tN2kMsg &N2kMsg);
     void handleHeadingTrackControl(const tN2kMsg &N2kMsg);
@@ -64,6 +64,10 @@ public:
     void onNMEA0183Attitude(float rollRad, float pitchRad);
     void onNMEA0183Pressure(float pressurePa);
     int displaySaver = DISPLAY_ACTIVE;
+
+    // While true, setupTime() does not touch the system clock. RecordScreen sets
+    // this during a recording so log timestamps stay monotonic (see setupTime()).
+    volatile bool clockFrozen = false;
 
     tHeadingData cog{.when = 0, .origin = 0, .reference = tN2kHeadingReference::N2khr_Unavailable, .heading = 0.0};
     tDoubleData sog{.when = 0, .origin = 0, .value = 0.0}; // Speed in m/s
