@@ -16,6 +16,7 @@
 #include "TwaiLog.h"
 tNMEA2000 &NMEA2000 = *(new tNMEA2000_twai(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN));
 #include <Preferences.h>
+#include <Update.h>
 #include <WebServer.h>
 #include <time.h>
 
@@ -90,7 +91,10 @@ const char LogInstallationDescription1[] PROGMEM =
 const char LogInstallationDescription2[] PROGMEM =
     "Select NMEA 2000, SignalK and WiFi and format settings";
 
-const unsigned long AutopilotSerialNumber PROGMEM = 13;
+// Unique per installation. 0 means "not yet generated"; readPreferences()
+// fills this in on first boot and persists it (see deviceName for the same
+// pattern). Must fit NMEA2000's 21-bit unique number field (< 2097152).
+static unsigned long n2kSerialNumber = 0;
 const unsigned char LogDeviceFunction PROGMEM = 140; // Log Recorder
 const unsigned char LogtDeviceClass = 20;            // Safety Systems
 const uint16_t LogManufacturerCode = 2046;           // Free?
@@ -269,6 +273,7 @@ void writePreferences() {
   n2kSources = join(sources, MAX_SOURCES, ',');
   preferences.putString("N2KSOURCES", n2kSources);
   preferences.putString("DEVICENAME", deviceName);
+  preferences.putULong("N2KSERIAL", n2kSerialNumber);
   preferences.end();
 }
 
@@ -286,6 +291,7 @@ void readPreferences() {
   use0183 = preferences.getBool("USE0183", false);
 
   deviceName = preferences.getString("DEVICENAME", "");
+  n2kSerialNumber = preferences.getULong("N2KSERIAL", 0);
   n2kSources = preferences.getString("N2KSOURCES", n2kSources);
   n_sources = splitter((char *)(n2kSources.c_str()), sources, ',',
                        n2kSources.length(), MAX_SOURCES);
@@ -301,6 +307,17 @@ void readPreferences() {
     deviceName = "LOGBOOK_" + String(random(100, 1000));
     preferences.begin("Logbook", false);
     preferences.putString("DEVICENAME", deviceName);
+    preferences.end();
+  }
+
+  if (n2kSerialNumber == 0) {
+    // First boot: generate a unique NMEA2000 device serial number and
+    // persist it, so every installation claims a distinct NAME on the bus
+    // without needing a per-board firmware edit. Range stays within
+    // NMEA2000's 21-bit unique number field.
+    n2kSerialNumber = random(1000, 2000000);
+    preferences.begin("Logbook", false);
+    preferences.putULong("N2KSERIAL", n2kSerialNumber);
     preferences.end();
   }
   Serial.println("============== Preferences ================= ");
@@ -466,7 +483,10 @@ void handleMenu() {
   output += "<li><a href=\"" + getFullUri("prefs") +
             "\">Prefer&egrave;ncies</a></li>";
   output += "<li><a href=\"" + getFullUri("logs") + "\">Logs</a></li>";
-  output += "<li><a href=\"" + getFullUri("restart") + "\">Restart</a></li>";
+  output += "<li><a href=\"" + getFullUri("restart") + "\">Restart</a></li><hr>";
+  output += "<li><a href=\"" + getFullUri("update") +
+            "\">Firmware Update</a></li>";
+
   output += "</ul>";
   output += "</body></html>";
   unsigned long len = output.length();
@@ -625,6 +645,55 @@ void handleRestart() {
   Serial.println("Restarting");
   ESP.restart();
 }
+
+void handleUpdatePage() {
+  Serial.println("handleUpdatePage");
+  String output =
+      "<html><head><title>Firmware Update</title><meta name=\"viewport\" "
+      "content=\"width=device-width, initial-scale=1.0\"></head><body>";
+  output += "<h1><a href=\"" + getFullUri("index.html") + "\">" + deviceName +
+            "</a>/Firmware Update</h1>";
+  output += "<form method=\"POST\" action=\"" + getFullUri("update") +
+            "\" enctype=\"multipart/form-data\">";
+  output += "<input type=\"file\" name=\"update\" accept=\".bin\"> ";
+  output += "<input type=\"submit\" value=\"Update\">";
+  output += "</form>";
+  output += "</body></html>";
+  unsigned long len = output.length();
+  server.sendHeader("Content-Length", String(len));
+  server.send(200, "text/html", output);
+}
+
+void handleUpdateUpload() {
+  HTTPUpload &upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    Serial.printf("Update: %s\n", upload.filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) {
+      Serial.printf("Update Success: %u bytes\n", upload.totalSize);
+    } else {
+      Update.printError(Serial);
+    }
+  }
+}
+
+void handleUpdateResult() {
+  if (Update.hasError()) {
+    server.send(200, "text/plain", "Update FAILED. Check serial log.");
+  } else {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", "Update OK. Rebooting...");
+    delay(500);
+    ESP.restart();
+  }
+}
 // WiFI
 boolean checkConnection() { // Check wifi connection.
   int count = 0;            // count.
@@ -649,6 +718,8 @@ void startWebServer() {
   server.on("/clear", HTTP_GET, handleDeleteAll);
   server.on("/help", HTTP_GET, handleHelp);
   server.on("/restart", HTTP_GET, handleRestart);
+  server.on("/update", HTTP_GET, handleUpdatePage);
+  server.on("/update", HTTP_POST, handleUpdateResult, handleUpdateUpload);
 
   server.onNotFound([]() {
     if (server.uri().startsWith("/del")) {
@@ -766,7 +837,8 @@ void setup_NMEA2000() {
                                               LogInstallationDescription2);
   // Set device information
   NMEA2000.SetDeviceInformation(
-      AutopilotSerialNumber, // Unique number. Use e.g. Serial number.
+      n2kSerialNumber, // Unique number, generated per installation on first
+                       // boot and persisted (see readPreferences).
       LogDeviceFunction,     // Device function=Autopìlot. See codes on
                          // https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
       LogtDeviceClass, // Device class=Steering and Control Surfaces. See codes

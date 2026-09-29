@@ -7,6 +7,7 @@
 #include "pgnsToString.h"
 #include "State.h"
 #include "Utilities.h"
+#include "Polar.h"
 
 extern int sources[MAX_SOURCES];
 extern int n_sources;
@@ -993,6 +994,17 @@ void tState::saveCsv(File f, double distance, const struct tm &timeinfo)
   // Placeholder columns (not computed here)
   f.print("\t0\t0\t0\t0\t0");
 
+  // polar_p — SOG / interpolated polar target speed(TWA, TWS)
+  // trueWind.angle is TWD (from north); TWA = TWD - heading, folded to 0-180.
+  double heading = (trueHeading.when != 0) ? trueHeading.heading : cog.heading;
+  double twaDeg = (trueWind.angle - heading) * 180.0 / PI;
+  twaDeg = fmod(twaDeg, 360.0);
+  if (twaDeg < 0.0) twaDeg += 360.0;
+  if (twaDeg > 180.0) twaDeg = 360.0 - twaDeg;
+  double twsKn = trueWind.speed * 3600.0 / 1852.0;
+  double sogKn = sog.value * 3600.0 / 1852.0;
+  f.print('\t'); f.print(polarEfficiency(twaDeg, twsKn, sogKn), 2);
+
   f.println();
 }
 
@@ -1008,7 +1020,7 @@ void tState::saveCsvHeader(File f)
             "\tDPT\tRPM\tEngTw"
             "\tTWD\tTWS"
             "\tBARO_raw"
-            "\tWind\tGust\tAWA\tAWS\tOM_grade");
+            "\tWind\tGust\tAWA\tAWS\tOM_grade\tpolar_p");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions
