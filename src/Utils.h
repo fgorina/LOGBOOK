@@ -1,6 +1,6 @@
 #pragma once
 
-String join(int *data, int n, char sep)
+inline String join(int *data, int n, char sep)
 {
 
     char buffer[100];
@@ -29,7 +29,7 @@ String join(int *data, int n, char sep)
     return String(buffer);
 }
 
-int splitter(char *in, int *out, char sep, int maxin, int maxout)
+inline int splitter(char *in, int *out, char sep, int maxin, int maxout)
 {
 
     char buffer[10];
@@ -60,7 +60,7 @@ int splitter(char *in, int *out, char sep, int maxin, int maxout)
     return n;
 }
 
-void testSplitter()
+inline void testSplitter()
 {
 
     const char *input = "10, 11, 12, 13,14,15";
