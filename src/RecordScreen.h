@@ -2,6 +2,7 @@
 
 
 #include "Screen.h"
+#include "SailsScreen.h"
 #include "State.h"
 #include <SD.h>
 
@@ -21,7 +22,12 @@ class RecordScreen : public Screen
     static const int MAXBUFFER = 64;
     
     Button *brecord = nullptr;
+    Button *bsails = nullptr;
     tState* state;
+
+    // Shown on top of this screen so the recording goes on
+    SailsScreen *sailsScreen;
+    bool showingSails = false;
     char buffer[64];
     bool recording = false;
 

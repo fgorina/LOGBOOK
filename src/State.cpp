@@ -12,6 +12,10 @@
 extern int sources[MAX_SOURCES];
 extern int n_sources;
 
+const char *const tState::SAIL_NAMES[tState::N_SAILS] = {
+    "Main", "Mizzen", "Genoa 1", "Genoa 2", "Genoa 3",
+    "Spinnaker", "Gennaker", "Code 0", "Other 1", "Other 2"};
+
 // Given GPS time (seconds since epoch, may carry a fraction) updates the RTC
 // and the POSIX system clock.
 //
@@ -1005,6 +1009,13 @@ void tState::saveCsv(File f, double distance, const struct tm &timeinfo)
   double sogKn = sog.value * 3600.0 / 1852.0;
   f.print('\t'); f.print(polarEfficiency(twaDeg, twsKn, sogKn), 2);
 
+  // sails — state of the 10 sail positions, comma separated
+  f.print('\t');
+  for (int i = 0; i < N_SAILS; i++) {
+    if (i != 0) f.print(',');
+    f.print(sails[i]);
+  }
+
   f.println();
 }
 
@@ -1020,7 +1031,7 @@ void tState::saveCsvHeader(File f)
             "\tDPT\tRPM\tEngTw"
             "\tTWD\tTWS"
             "\tBARO_raw"
-            "\tWind\tGust\tAWA\tAWS\tOM_grade\tpolar_p");
+            "\tWind\tGust\tAWA\tAWS\tOM_grade\tpolar_p\tsails");
 }
 
 // Export an extended trakpt. There are a lot of particular extensions

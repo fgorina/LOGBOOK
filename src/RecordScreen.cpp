@@ -9,13 +9,16 @@ RecordScreen::RecordScreen(int width, int height, const char *title, tState *sta
 {
     this->state = state;
     this->period = period;
+    sailsScreen = new SailsScreen(width, height, "Sails", state);
 }
 void RecordScreen::enter()
 {
-    Serial.println("RecordScreen::enter");  
+    Serial.println("RecordScreen::enter");
     const ButtonColors off_clrs = {BLACK, CYAN, WHITE};
     const ButtonColors on_clrs = {BLUE, CYAN, WHITE};
     brecord = new Button(width / 2 + width / 8, height / 2 - 30, width / 4, 60, false, "Start", off_clrs, on_clrs, MC_DATUM);
+    bsails = new Button(width / 2 + width / 8, 44, width / 4, 40, false, "Sails", off_clrs, on_clrs, MC_DATUM);
+    showingSails = false;
     recording = true;
     old_second_millis = millis();
     startRecord();
@@ -26,8 +29,22 @@ void RecordScreen::exit()
 {
     Serial.println("RecordScreen::exit");
 
+    if (showingSails)
+    {
+        sailsScreen->exit();
+        showingSails = false;
+    }
+
     if (recording)
         stopRecord();
+
+    if (bsails != nullptr)
+    {
+        bsails->delHandlers();
+        bsails->hide(BLACK);
+        delete (bsails);
+        bsails = nullptr;
+    }
 
     if (brecord != nullptr)
     {
@@ -43,8 +60,14 @@ void RecordScreen::draw()
 {
 
     Serial.println("RecordScreen::draw");
+    if (showingSails)
+    {
+        sailsScreen->draw();
+        return;
+    }
     M5.Display.clear();
 
+    bsails->draw();
     brecord->draw();
     draw_distance();
     draw_data();
@@ -113,7 +136,8 @@ int RecordScreen::run(const m5::touch_detail_t &t)
 {
     if (millis() - old_second_millis >= 1000){
         old_second_millis = millis();
-        draw_data();
+        if (!showingSails)
+            draw_data();
     }
     if (recording)
     {
@@ -136,9 +160,29 @@ int RecordScreen::run(const m5::touch_detail_t &t)
                 old_lat = lat2;
                 old_lon = lon2;
              }
-            draw_distance();
+            if (!showingSails)
+                draw_distance();
         }
     }
+
+    if (showingSails)
+    {
+        if (sailsScreen->run(t) == 0)
+        {
+            sailsScreen->exit();
+            showingSails = false;
+            draw();
+        }
+        return -1;
+    }
+
+    if (bsails != nullptr && state->displaySaver == DISPLAY_ACTIVE && bsails->handleTouch(t))
+    {
+        showingSails = true;
+        sailsScreen->enter();
+        return -1;
+    }
+
     if (brecord != nullptr && state->displaySaver ==  DISPLAY_ACTIVE && brecord->handleTouch(t))
     {
         if(!recording){

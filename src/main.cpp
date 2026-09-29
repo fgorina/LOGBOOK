@@ -274,6 +274,15 @@ void writePreferences() {
   preferences.putString("N2KSOURCES", n2kSources);
   preferences.putString("DEVICENAME", deviceName);
   preferences.putULong("N2KSERIAL", n2kSerialNumber);
+  preferences.putUShort("SAILSMASK", state->sailsAvailable);
+  preferences.putString("SAILS", join(state->sails, tState::N_SAILS, ','));
+  preferences.end();
+}
+
+// Called by SailsScreen on every change so the active sails survive a reboot
+void writeSailState() {
+  preferences.begin("Logbook", false);
+  preferences.putString("SAILS", join(state->sails, tState::N_SAILS, ','));
   preferences.end();
 }
 
@@ -292,6 +301,10 @@ void readPreferences() {
 
   deviceName = preferences.getString("DEVICENAME", "");
   n2kSerialNumber = preferences.getULong("N2KSERIAL", 0);
+  state->sailsAvailable = preferences.getUShort("SAILSMASK", 0);
+  String sailState = preferences.getString("SAILS", "");
+  splitter((char *)(sailState.c_str()), state->sails, ',', sailState.length(),
+           tState::N_SAILS);
   n2kSources = preferences.getString("N2KSOURCES", n2kSources);
   n_sources = splitter((char *)(n2kSources.c_str()), sources, ',',
                        n2kSources.length(), MAX_SOURCES);
@@ -583,6 +596,14 @@ void handlePreferences() {
       "<tr><td><label for=\"use0183\">Use NMEA 0183:</label></td><td><input "
       "type=\"checkbox\" id=\"use0183\" name=\"use0183\" value=\"on\" " +
       String(use0183 ? "checked" : "") + "></td></tr>";
+  output += "<tr><td colspan=2><h3>Sails on board</h3></td></tr>";
+  for (int i = 0; i < tState::N_SAILS; i++) {
+    String id = "sail" + String(i);
+    output += "<tr><td><label for=\"" + id + "\">" + tState::SAIL_NAMES[i] +
+              ":</label></td><td><input type=\"checkbox\" id=\"" + id +
+              "\" name=\"" + id + "\" value=\"on\" " +
+              String(state->hasSail(i) ? "checked" : "") + "></td></tr>";
+  }
   output += "<tr><td colspan=2 align=center><input type=\"submit\" "
             "value=\"Submit\"></td></tr>";
   output += "</table>";
@@ -634,6 +655,15 @@ void handleUpdatePreferences() {
       sources[i] = -1;
     }
   }
+  uint16_t sailsAvailable = 0;
+  for (int i = 0; i < tState::N_SAILS; i++) {
+    if (server.hasArg("sail" + String(i))) {
+      sailsAvailable |= 1 << i;
+    } else {
+      state->sails[i] = 0; // Not on board, so never set
+    }
+  }
+  state->sailsAvailable = sailsAvailable;
   writePreferences();
   server.sendHeader("Location", getFullUri("index.html"), true);
   server.send(302, "text/plain", "");

@@ -94,6 +94,14 @@ public:
     tDoubleData oilPressure{.when = 0, .origin = 0, .value = 0.0}; // Engine Temperature
     tDoubleData atmosphericPressure{.when = 0, .origin = 0, .value = 0.0}; // Pa — environment.outside.pressure
 
+    // Sails. Index 0-9 is sail position 1-10 (see SAIL_NAMES).
+    // State: 0 lowered, 1 full, 2 one reef, 3 two reefs, 4 three reefs.
+    static const int N_SAILS = 10;
+    static const char *const SAIL_NAMES[N_SAILS];
+    uint16_t sailsAvailable = 0;   // bit i set = sail i is on board
+    int sails[N_SAILS] = {};       // Active state, written to the log
+    bool hasSail(int i) const { return sailsAvailable & (1 << i); }
+
 
     // RW , Commands and data - Not used for the moment
     tModeData mode{.when = 0, .origin = 0, .value = tPyPilotMode::compass}; // ap.mode
