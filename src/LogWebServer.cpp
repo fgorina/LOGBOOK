@@ -1,6 +1,6 @@
 /* Configuration web server
 
-    Pages served on http://<deviceName>.local/ : menu, preferences, logs
+    Pages served on http://<deviceName>.local/ or http://<ip>/ : menu, preferences, logs
     (list, download, delete), help, restart and firmware update.
 */
 
@@ -79,8 +79,14 @@ String getContentType(String filename) {
   return "text/plain";
 }
 
+// Root-relative, so links keep whatever host the browser used: the mDNS name
+// locally or the IP over a VPN. Paths already starting with "/" (log files)
+// are returned as is, as "//logs/..." would be read as a host name.
 String getFullUri(String last) {
-  return "http://" + deviceName + ".local/" + last;
+  if (last.startsWith("/")) {
+    return last;
+  }
+  return "/" + last;
 }
 
 void handleHelp() {
