@@ -2,16 +2,22 @@
 
     Pages served on http://<deviceName>.local/ or http://<ip>/ : menu, preferences, logs
     (list, download, delete), help, restart and firmware update.
+
+    Uses ESPAsyncWebServer: handlers run in the AsyncTCP task and several
+    connections are served at once, so a browser's idle extra connections
+    don't stall the page (the synchronous WebServer served one at a time).
 */
 
 #include "LogWebServer.h"
 
 #include <Arduino.h>
+#include <ESPAsyncWebServer.h>
 #include <SD.h>
 #include <SPIFFS.h>
 #include <Update.h>
-#include <WebServer.h>
+#include <memory>
 
+#include "BuildInfo.h"
 #include "Constants.h"
 #include "RecordScreen.h"
 #include "State.h"
@@ -36,16 +42,47 @@ extern int n_sources;
 extern String deviceName;
 extern tState *state;
 extern Screen *screens[6];
+extern SemaphoreHandle_t sdMutex;
 
 void writePreferences();
 
-static WebServer server(80);
+static AsyncWebServer server(80);
 
-void handleWebServer() { server.handleClient(); }
+// Handlers can't restart the device themselves: the response would never be
+// sent. They set this and the network task restarts once it is due.
+static volatile unsigned long restartAt = 0;
+
+static void scheduleRestart() {
+  restartAt = millis() + 1000;
+  if (restartAt == 0) {
+    restartAt = 1;
+  }
+}
+
+void handleWebServer() {
+  if (restartAt != 0 && (long)(millis() - restartAt) >= 0) {
+    Serial.println("Restarting");
+    ESP.restart();
+  }
+}
+
+// The recorder and the uploader also use the SD, from other tasks. Don't
+// block the AsyncTCP task waiting for them: answer 503 and let the browser retry.
+static const TickType_t kLockTimeout = pdMS_TO_TICKS(200);
+
+static bool tryLockSD() { return xSemaphoreTake(sdMutex, kLockTimeout) == pdTRUE; }
+
+static void unlockSD() { xSemaphoreGive(sdMutex); }
+
+static void sendBusy(AsyncWebServerRequest *request) {
+  AsyncWebServerResponse *r = request->beginResponse(503, "text/plain", "SD busy");
+  r->addHeader("Retry-After", "1");
+  request->send(r);
+}
 
 
-String getContentType(String filename) {
-  if (server.hasArg("download")) {
+String getContentType(AsyncWebServerRequest *request, String filename) {
+  if (request->hasArg("download")) {
     return "application/octet-stream";
   } else if (filename.endsWith(".htm")) {
     return "text/html";
@@ -89,87 +126,151 @@ String getFullUri(String last) {
   return "/" + last;
 }
 
-void handleHelp() {
+void handleHelp(AsyncWebServerRequest *request) {
   Serial.println("handleHelp");
-  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
+  // Stays mounted: the file is read after this handler returns
+  static bool spiffsMounted = false;
+  if (!spiffsMounted) {
+    spiffsMounted = SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED);
+  }
+  if (!spiffsMounted) {
     Serial.println("SPIFFS Mount Failed");
+    request->send(500, "text/plain", "SPIFFS Mount Failed");
     return;
   }
-  File file = SPIFFS.open("/help.html", "r");
-  if (!file) {
+  if (!SPIFFS.exists("/help.html")) {
     Serial.println("File not found");
-  } else {
-    server.streamFile(file, "text/html");
-    file.close();
+    request->send(404, "text/plain", "FileNotFound");
+    return;
   }
-  SPIFFS.end();
+  request->send(SPIFFS, "/help.html", "text/html");
 }
-bool handleFileRead(String spath) {
-  String path = spath;
+
+void handleFileRead(AsyncWebServerRequest *request) {
+  String path = request->url();
   Serial.printf("Downloading %s\n", path.c_str());
   if (path.endsWith("/")) {
     path += "index.htm";
   }
 
-  if (!SD.exists(path)) {
+  if (!tryLockSD()) {
+    sendBusy(request);
+    return;
+  }
+  File file = SD.exists(path) ? SD.open(path, FILE_READ) : File();
+  bool isFile = file && !file.isDirectory();
+  if (file && !isFile) {
+    file.close();
+  }
+  unlockSD();
+
+  if (!isFile) {
     Serial.println("File " + path + " not found.");
-    server.send(404, "text/plain", "FileNotFound");
-    return false;
+    request->send(404, "text/plain", "FileNotFound");
+    return;
   }
 
   Serial.println("handleFileRead: " + path);
-  String contentType = getContentType(path);
-
-  File file = SD.open(path, FILE_READ);
-  if (file) {
-    server.streamFile(file, contentType);
-    file.close();
-    return true;
-  } else {
-    Serial.println("File " + path + " not found.");
-    return false;
+  // Chunked so every SD read happens under sdMutex (the recorder and the
+  // uploader share the card). The shared_ptr closes the file when the
+  // response is destroyed.
+  auto f = std::make_shared<File>(file);
+  String name = path.substring(path.lastIndexOf('/') + 1);
+  AsyncWebServerResponse *r = request->beginChunkedResponse(
+      getContentType(request, path),
+      [f](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if (!tryLockSD()) {
+          return RESPONSE_TRY_AGAIN;
+        }
+        size_t n = f->read(buffer, maxLen);
+        unlockSD();
+        return n;  // 0 ends the response
+      });
+  if (request->hasArg("download") || path.startsWith("/logs/")) {
+    r->addHeader("Content-Disposition", "attachment; filename=\"" + name + "\"");
   }
+  request->send(r);
 }
 
-void handleFileList() {
+// Directory listing in progress, kept alive by the chunked response
+struct LogListState {
+  File root;
+  String pending;
+  bool done = false;
+  ~LogListState() {
+    if (root) {
+      root.close();
+    }
+  }
+};
+
+void handleFileList(AsyncWebServerRequest *request) {
+  // "/logs" also matches "/logs/<file>": those are downloads
+  if (request->url() != "/logs") {
+    handleFileRead(request);
+    return;
+  }
   Serial.println("handleFileList");
 
-  // Stream in chunks: avoids building a large String in heap and lets the
-  // browser receive data progressively without waiting for the full page.
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-
-  server.sendContent("<html><head><title>Logs</title>"
-                     "<meta name=\"viewport\" content=\"width=device-width, "
-                     "initial-scale=1.0\">"
-                     "</head><body>\n");
-  server.sendContent("<h1><a href=\"" + getFullUri("index.html") + "\">" +
-                     deviceName + "</a>/Logs</h1>\n");
-  server.sendContent("<a href=\"" + getFullUri("ask") +
-                     "\">Esborrar tots els Logs</a><br>\n");
-  server.sendContent("<ul>\n");
-
-  File root = SD.open("/logs");
-  if (root.isDirectory()) {
-    File file = root.openNextFile();
-    while (file) {
-      if (file.name()[0] != '.') {
-        String path = file.path();
-        server.sendContent("<li><a href=\"" + getFullUri(path) + "\">" +
-                           file.name() +
-                           "</a>&nbsp;&nbsp;"
-                           "<a href=\"" +
-                           getFullUri("del/" + path) + "\">Delete</a></li>\n");
-      }
-      file = root.openNextFile();
-    }
-    root.close();
+  auto st = std::make_shared<LogListState>();
+  if (!tryLockSD()) {
+    sendBusy(request);
+    return;
   }
+  st->root = SD.open("/logs");
+  unlockSD();
 
-  server.sendContent("</ul></body></html>\n");
+  st->pending = "<html><head><title>Logs</title>"
+                "<meta name=\"viewport\" content=\"width=device-width, "
+                "initial-scale=1.0\">"
+                "</head><body>\n";
+  st->pending += "<h1><a href=\"" + getFullUri("index.html") + "\">" +
+                 deviceName + "</a>/Logs</h1>\n";
+  st->pending += "<a href=\"" + getFullUri("ask") +
+                 "\">Esborrar tots els Logs</a><br>\n";
+  st->pending += "<ul>\n";
+
+  // Send in chunks: avoids building a large String in heap and lets the
+  // browser receive data progressively without waiting for the full page.
+  request->sendChunked(
+      "text/html",
+      [st](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if (!st->done && st->pending.length() < maxLen && tryLockSD()) {
+          while (!st->done && st->pending.length() < maxLen) {
+            File file = (st->root && st->root.isDirectory())
+                            ? st->root.openNextFile()
+                            : File();
+            if (!file) {
+              if (st->root) {
+                st->root.close();
+              }
+              st->pending += "</ul></body></html>\n";
+              st->done = true;
+            } else {
+              if (file.name()[0] != '.') {
+                String path = file.path();
+                st->pending += "<li><a href=\"" + getFullUri(path) + "\">" +
+                               file.name() +
+                               "</a>&nbsp;&nbsp;"
+                               "<a href=\"" +
+                               getFullUri("del/" + path) + "\">Delete</a></li>\n";
+              }
+              file.close();
+            }
+          }
+          unlockSD();
+        }
+        if (st->pending.isEmpty()) {
+          return st->done ? 0 : RESPONSE_TRY_AGAIN;
+        }
+        size_t n = min(maxLen, (size_t)st->pending.length());
+        memcpy(buffer, st->pending.c_str(), n);
+        st->pending.remove(0, n);
+        return n;
+      });
 }
 
-void handleMenu() {
+void handleMenu(AsyncWebServerRequest *request) {
   Serial.println("handleMenu");
   String output = "<html><head>"
                   "<meta name=\"viewport\" content=\"width=device-width, "
@@ -189,13 +290,12 @@ void handleMenu() {
             "\">Firmware Update</a></li>";
 
   output += "</ul>";
+  output += "<p><small>Firmware: " FW_VERSION " (" FW_BUILD_TIME ")</small></p>";
   output += "</body></html>";
-  unsigned long len = output.length();
-  server.sendHeader("Content-Length", String(len));
-  server.send(200, "text/html", output);
+  request->send(200, "text/html", output);
 }
 
-void handleAskForDelete() {
+void handleAskForDelete(AsyncWebServerRequest *request) {
   Serial.println("handleAskForDelete");
   String output =
       "<html><head><title>Confirmeu, si us plau</title><meta name=\"viewport\" "
@@ -203,13 +303,15 @@ void handleAskForDelete() {
   output +=
       "Segur que voleu esborrar tots els logs? <a href=" + getFullUri("clear") +
       ">Si</a> <a href=" + getFullUri("logs") + ">No</a>";
-  unsigned long len = output.length();
-  server.sendHeader("Content-Length", String(len));
-  server.send(200, "text/html", output);
+  request->send(200, "text/html", output);
 }
-void handleDeleteAll() {
+void handleDeleteAll(AsyncWebServerRequest *request) {
   Serial.println("handleDeleteAll");
 
+  if (!tryLockSD()) {
+    sendBusy(request);
+    return;
+  }
   File root = SD.open("/");
 
   String output =
@@ -228,20 +330,29 @@ void handleDeleteAll() {
       file = root.openNextFile();
     }
   }
+  root.close();
+  unlockSD();
 
   output += "</ul>\n";
-  server.send(200, "text/html", output);
+  request->send(200, "text/html", output);
 }
 
-void deleteFile(String uri) {
+void deleteFile(AsyncWebServerRequest *request) {
+  String uri = request->url();
   Serial.println("deleteFile uri " + uri);
   String path = uri.substring(4, uri.length());
   Serial.println("deleteFile " + path);
+  if (!tryLockSD()) {
+    sendBusy(request);
+    return;
+  }
   SD.remove(path);
-  handleFileList();
+  unlockSD();
+  // Back to the list by redirect, so reloading it doesn't delete again
+  request->redirect(getFullUri("logs"));
 }
 
-void handlePreferences() {
+void handlePreferences(AsyncWebServerRequest *request) {
   Serial.println("handlePreferences");
   n2kSources = join(sources, MAX_SOURCES, ',');
   String output =
@@ -297,46 +408,46 @@ void handlePreferences() {
   output += "</table>";
   output += "</form>";
   output += "</body></html>";
-  unsigned long len = output.length();
-  server.sendHeader("Cache-Control", "no-cache");
-  server.sendHeader("Content-Length", String(len));
-  server.send(200, "text/html", output);
+  AsyncWebServerResponse *response =
+      request->beginResponse(200, "text/html", output);
+  response->addHeader("Cache-Control", "no-cache");
+  request->send(response);
 }
 
-void handleUpdatePreferences() {
+void handleUpdatePreferences(AsyncWebServerRequest *request) {
 
   Serial.println("handleUpdatePreferences");
-  if (server.hasArg("ssid")) {
-    wifi_ssid = server.arg("ssid");
+  if (request->hasArg("ssid")) {
+    wifi_ssid = request->arg("ssid");
   }
-  if (server.hasArg("password")) {
-    wifi_password = server.arg("password");
+  if (request->hasArg("password")) {
+    wifi_password = request->arg("password");
   }
-  if (server.hasArg("skserver")) {
-    skServer = server.arg("skserver");
+  if (request->hasArg("skserver")) {
+    skServer = request->arg("skserver");
   }
-  if (server.hasArg("skport")) {
-    skPort = server.arg("skport").toInt();
+  if (request->hasArg("skport")) {
+    skPort = request->arg("skport").toInt();
   }
-  if (server.hasArg("usexml")) {
+  if (request->hasArg("usexml")) {
     ((RecordScreen *)screens[1])->xmlFormat = true;
   } else {
     ((RecordScreen *)screens[1])->xmlFormat = false;
   }
 
-  if (server.hasArg("usen2k")) {
+  if (request->hasArg("usen2k")) {
     useN2k = true;
   } else {
     useN2k = false;
   }
-  if (server.hasArg("usesk")) {
+  if (request->hasArg("usesk")) {
     useSK = true;
   } else {
     useSK = false;
   }
-  use0183 = server.hasArg("use0183");
-  if (server.hasArg("n2kdevices")) {
-    n2kSources = server.arg("n2kdevices");
+  use0183 = request->hasArg("use0183");
+  if (request->hasArg("n2kdevices")) {
+    n2kSources = request->arg("n2kdevices");
     n_sources = splitter((char *)(n2kSources.c_str()), sources, ',',
                          n2kSources.length(), MAX_SOURCES);
     for (int i = n_sources; i < MAX_SOURCES; i++) {
@@ -345,7 +456,7 @@ void handleUpdatePreferences() {
   }
   uint16_t sailsAvailable = 0;
   for (int i = 0; i < tState::N_SAILS; i++) {
-    if (server.hasArg("sail" + String(i))) {
+    if (request->hasArg(("sail" + String(i)).c_str())) {
       sailsAvailable |= 1 << i;
     } else {
       state->sails[i] = 0; // Not on board, so never set
@@ -353,18 +464,15 @@ void handleUpdatePreferences() {
   }
   state->sailsAvailable = sailsAvailable;
   writePreferences();
-  server.sendHeader("Location", getFullUri("index.html"), true);
-  server.send(302, "text/plain", "");
+  request->redirect(getFullUri("index.html"));
 }
 
-void handleRestart() {
-  server.sendHeader("Location", getFullUri("index.html"), true);
-  server.send(302, "text/plain", "");
-  Serial.println("Restarting");
-  ESP.restart();
+void handleRestart(AsyncWebServerRequest *request) {
+  request->redirect(getFullUri("index.html"));
+  scheduleRestart();
 }
 
-void handleUpdatePage() {
+void handleUpdatePage(AsyncWebServerRequest *request) {
   Serial.println("handleUpdatePage");
   String output =
       "<html><head><title>Firmware Update</title><meta name=\"viewport\" "
@@ -377,64 +485,79 @@ void handleUpdatePage() {
   output += "<input type=\"submit\" value=\"Update\">";
   output += "</form>";
   output += "</body></html>";
-  unsigned long len = output.length();
-  server.sendHeader("Content-Length", String(len));
-  server.send(200, "text/html", output);
+  request->send(200, "text/html", output);
 }
 
-void handleUpdateUpload() {
-  HTTPUpload &upload = server.upload();
-  if (upload.status == UPLOAD_FILE_START) {
-    Serial.printf("Update: %s\n", upload.filename.c_str());
+void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
+                        size_t index, uint8_t *data, size_t len, bool final) {
+  if (index == 0) {
+    Serial.printf("Update: %s\n", filename.c_str());
+    // An upload cut midway leaves the previous update open: begin() would
+    // then refuse and this image would be appended to the partial one.
+    if (Update.isRunning()) {
+      Update.abort();
+    }
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
       Update.printError(Serial);
     }
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-      Update.printError(Serial);
-    }
-  } else if (upload.status == UPLOAD_FILE_END) {
+    request->onDisconnect([]() {
+      if (Update.isRunning()) {
+        Serial.println("Update: connection lost, aborting");
+        Update.abort();
+      }
+    });
+  }
+  if (len > 0 && Update.write(data, len) != len) {
+    Update.printError(Serial);
+  }
+  if (final) {
     if (Update.end(true)) {
-      Serial.printf("Update Success: %u bytes\n", upload.totalSize);
+      Serial.printf("Update Success: %u bytes\n", (unsigned)(index + len));
     } else {
       Update.printError(Serial);
     }
   }
 }
 
-void handleUpdateResult() {
+void handleUpdateResult(AsyncWebServerRequest *request) {
   if (Update.hasError()) {
-    server.send(200, "text/plain", "Update FAILED. Check serial log.");
+    // The reason goes to the browser too: the serial log may be out of reach
+    request->send(200, "text/plain",
+                  String("Update FAILED: ") + Update.errorString());
   } else {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", "Update OK. Rebooting...");
-    delay(500);
-    ESP.restart();
+    AsyncWebServerResponse *response =
+        request->beginResponse(200, "text/plain", "Update OK. Rebooting...");
+    response->addHeader("Connection", "close");
+    request->send(response);
+    scheduleRestart();
   }
 }
 
 void startWebServer() {
-  server.on("/", HTTP_GET, handleMenu);
-  server.on("/index.html", HTTP_GET, handleMenu);
-  server.on("/ask", HTTP_GET, handleAskForDelete);
-  server.on("/logs", HTTP_GET, handleFileList);
-  server.on("/prefs", HTTP_GET, handlePreferences);
-  server.on("/updatePrefs", HTTP_POST, handleUpdatePreferences);
-  server.on("/clear", HTTP_GET, handleDeleteAll);
-  server.on("/help", HTTP_GET, handleHelp);
-  server.on("/restart", HTTP_GET, handleRestart);
-  server.on("/update", HTTP_GET, handleUpdatePage);
-  server.on("/update", HTTP_POST, handleUpdateResult, handleUpdateUpload);
+  // Called again on every WiFi (re)connection: register the handlers once
+  static bool handlersRegistered = false;
+  if (!handlersRegistered) {
+    handlersRegistered = true;
+    server.on("/", HTTP_GET, handleMenu);
+    server.on("/index.html", HTTP_GET, handleMenu);
+    server.on("/ask", HTTP_GET, handleAskForDelete);
+    server.on("/logs", HTTP_GET, handleFileList);
+    server.on("/prefs", HTTP_GET, handlePreferences);
+    server.on("/updatePrefs", HTTP_POST, handleUpdatePreferences);
+    server.on("/clear", HTTP_GET, handleDeleteAll);
+    server.on("/help", HTTP_GET, handleHelp);
+    server.on("/restart", HTTP_GET, handleRestart);
+    server.on("/update", HTTP_GET, handleUpdatePage);
+    server.on("/update", HTTP_POST, handleUpdateResult, handleUpdateUpload);
 
-  server.onNotFound([]() {
-    if (server.uri().startsWith("/del")) {
-      deleteFile(server.uri());
-    } else if (!handleFileRead(server.uri())) {
-      server.send(404, "text/plain", "FileNotFound");
-    } else {
-      Serial.printf("Not Found %s\n", server.uri().c_str());
-    }
-  });
+    server.onNotFound([](AsyncWebServerRequest *request) {
+      if (request->url().startsWith("/del")) {
+        deleteFile(request);
+      } else {
+        handleFileRead(request);
+      }
+    });
+  }
 
   server.begin();
   Serial.println("HTTP server started");

@@ -21,6 +21,7 @@ tNMEA2000 &NMEA2000 = *(new tNMEA2000_twai(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN));
 #include "PyTypes.h"
 
 #include <ESPmDNS.h>
+#include "BuildInfo.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -367,11 +368,12 @@ boolean checkConnection() { // Check wifi connection.
 }
 
 boolean startWiFiAP() {
-  Serial.println("Creating wifi AP: " + deviceName + " / 12345678");
+  Serial.println("Creating wifi AP: " + deviceName + " / " AP_PASSWORD);
   WiFi.mode(wifi_mode_t::WIFI_MODE_AP);
-  WiFi.softAP(deviceName.c_str(), "12345678");
+  WiFi.softAP(deviceName.c_str(), AP_PASSWORD);
   IPAddress IP = WiFi.softAPIP();
   Serial.println("Ip : " + IP.toString());
+  myIp = IP.toString();
 
   // Start mdns so we have a name
 
@@ -395,6 +397,9 @@ boolean startWiFi() { // Check whether there is wifi configuration information
   Serial.print(" ");
   Serial.println(wifi_password);
   WiFi.mode(wifi_mode_t::WIFI_MODE_STA);
+  // Modem sleep drops multicast packets, so mDNS queries get lost and the
+  // client has to retry (seconds) before <deviceName>.local resolves.
+  WiFi.setSleep(false);
   WiFi.begin((char *)wifi_ssid.c_str(), (char *)wifi_password.c_str());
 
   if (checkConnection()) {
@@ -568,7 +573,7 @@ void networkTask(void *parameter) {
   while (true) {
     // Check wifi_ssid first (cheap). In AP mode wifi_ssid is empty so
     // checkConnection() — which blocks up to 10 s waiting for WL_CONNECTED —
-    // is never called, letting handleClient() run at full speed.
+    // is never called.
     if (!wifi_ssid.isEmpty() && !checkConnection()) {
       Serial.println("Starting WiFi");
       startWiFi();
@@ -688,6 +693,7 @@ void setup() {
   M5.begin();
   M5.Display.setRotation(1); // 3 per la versio NMEA 2000 del M5Though, 1 for the rest
   Serial.begin(115200);
+  Serial.println("Firmware: " FW_VERSION " (" FW_BUILD_TIME ")");
   M5.Display.wakeup();
 
   readPreferences();

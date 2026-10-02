@@ -1,4 +1,6 @@
 #include "InfoScreen.h"
+#include "Constants.h"
+#include "BuildInfo.h"
 
 
 InfoScreen::InfoScreen(String *deviceName, String *ssid, String *ip, bool* useN2k, bool* useSK, bool* use0183, String* skServer, int* skPort,  String* sources,  int width, int height, const char *title):Screen (width, height, title)
@@ -70,9 +72,18 @@ void InfoScreen::draw()
 
     M5.Display.setTextDatum(TC_DATUM);
     M5.Display.drawString(*deviceName, width / 2, 10);
+    // Which build is running, small under the title
+    M5.Display.setFont(&fonts::Font0);
+    M5.Display.drawString(FW_VERSION "  " FW_BUILD_TIME, width / 2, 32);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
 
     M5.Display.setTextDatum(BL_DATUM);
-    M5.Display.drawString("SSID: " + *ssid , 10, pos+=delta);
+    if (ssid->isEmpty()) {
+        // No network configured: we are the AP, show how to join it
+        M5.Display.drawString("AP: " + *deviceName + " / " AP_PASSWORD, 10, pos+=delta);
+    } else {
+        M5.Display.drawString("SSID: " + *ssid , 10, pos+=delta);
+    }
 
     M5.Display.drawString("IP: " + *ip , 10, pos+=delta);
     M5.Display.drawString("N2K " + String(*useN2k ? "Si" : "No") + "  SK " + String(*useSK ? "Si" : "No") + "  0183 " + String(*use0183 ? "Si" : "No"), 10, pos+=delta);
