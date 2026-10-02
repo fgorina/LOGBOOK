@@ -381,6 +381,7 @@ boolean startWiFiAP() {
     Serial.println("Error setting up MDNS responder!");
   } else {
     Serial.println("mDNS responder started");
+    MDNS.addService("logbook", "tcp", 80); // lets PaperConsole find us
   }
 
   startWebServer();
@@ -429,6 +430,7 @@ boolean startWiFi() { // Check whether there is wifi configuration information
       Serial.println("Error setting up MDNS responder!");
     } else {
       Serial.println("mDNS responder started");
+    MDNS.addService("logbook", "tcp", 80); // lets PaperConsole find us
     }
     // Try to connect to signalk
     vTaskDelay(5);
