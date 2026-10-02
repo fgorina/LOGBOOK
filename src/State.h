@@ -100,6 +100,7 @@ public:
     static const char *const SAIL_NAMES[N_SAILS];
     uint16_t sailsAvailable = 0;   // bit i set = sail i is on board
     int sails[N_SAILS] = {};       // Active state, written to the log
+    volatile bool sailsDirty = false; // set when sails[] changed outside the Sails screen
     bool hasSail(int i) const { return sailsAvailable & (1 << i); }
 
 

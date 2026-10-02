@@ -45,6 +45,7 @@ extern Screen *screens[6];
 extern SemaphoreHandle_t sdMutex;
 
 void writePreferences();
+void writeSailState();
 
 static AsyncWebServer server(80);
 
@@ -533,6 +534,98 @@ void handleUpdateResult(AsyncWebServerRequest *request) {
   }
 }
 
+// ---- Sails API for remote displays ----
+// State values as in tState::sails: 0 lowered, 1 full, 2-4 one to three reefs.
+static const char *const SAIL_STATE_NAMES[] = {"down", "up", "reef1", "reef2", "reef3"};
+static const int N_SAIL_STATES = 5;
+
+// GET /api/sails -> {"sails":[{"id":0,"name":"Main","state":"up"},...]}
+// Only the sails on board are listed.
+static String sailsJson() {
+  String out = "{\"sails\":[";
+  bool first = true;
+  for (int i = 0; i < tState::N_SAILS; i++) {
+    if (!state->hasSail(i)) {
+      continue;
+    }
+    int s = state->sails[i];
+    if (s < 0 || s >= N_SAIL_STATES) {
+      s = 0;
+    }
+    if (!first) {
+      out += ",";
+    }
+    first = false;
+    out += "{\"id\":" + String(i) + ",\"name\":\"" + tState::SAIL_NAMES[i] +
+           "\",\"state\":\"" + SAIL_STATE_NAMES[s] + "\"}";
+  }
+  out += "]}";
+  return out;
+}
+
+void handleSailsGet(AsyncWebServerRequest *request) {
+  request->send(200, "application/json", sailsJson());
+}
+
+// State value (0-4) for a state name if id is a sail on board, -1 otherwise
+static int checkSail(int id, const String &value) {
+  if (id < 0 || id >= tState::N_SAILS || !state->hasSail(id)) {
+    return -1;
+  }
+  for (int i = 0; i < N_SAIL_STATES; i++) {
+    if (value.equalsIgnoreCase(SAIL_STATE_NAMES[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// POST /api/sails  sail<id>=<down|up|reef1|reef2|reef3>, one or more
+// (form body or query string), e.g. sail0=reef1&sail2=down.
+// Only changes the state of sails on board; sails are added or removed in the
+// preferences. All or nothing: if any pair is invalid nothing changes.
+// Answers with the new status.
+void handleSailsPost(AsyncWebServerRequest *request) {
+  int values[tState::N_SAILS];  // -1 = leave as is
+  for (int i = 0; i < tState::N_SAILS; i++) {
+    values[i] = -1;
+  }
+  bool any = false;
+
+  for (size_t p = 0; p < request->params(); p++) {
+    const AsyncWebParameter *param = request->getParam(p);
+    const String &key = param->name();
+    if (!key.startsWith("sail")) {
+      continue;
+    }
+    String idArg = key.substring(4);
+    int id = idArg.toInt();
+    if (id == 0 && idArg != "0") {
+      id = -1;  // not a number
+    }
+    int value = checkSail(id, param->value());
+    if (value == -1) {
+      request->send(400, "text/plain", "bad sail or state: " + key);
+      return;
+    }
+    values[id] = value;
+    any = true;
+  }
+  if (!any) {
+    request->send(400, "text/plain", "sail<id>=<state> required");
+    return;
+  }
+  for (int i = 0; i < tState::N_SAILS; i++) {
+    if (values[i] != -1) {
+      state->sails[i] = values[i];
+      Serial.printf("Sail %d -> %s\n", i, SAIL_STATE_NAMES[values[i]]);
+    }
+  }
+  state->sailsDirty = true;
+  writeSailState();
+  request->send(200, "application/json", sailsJson());
+}
+
 void startWebServer() {
   // Called again on every WiFi (re)connection: register the handlers once
   static bool handlersRegistered = false;
@@ -546,6 +639,8 @@ void startWebServer() {
     server.on("/updatePrefs", HTTP_POST, handleUpdatePreferences);
     server.on("/clear", HTTP_GET, handleDeleteAll);
     server.on("/help", HTTP_GET, handleHelp);
+    server.on("/api/sails", HTTP_GET, handleSailsGet);
+    server.on("/api/sails", HTTP_POST, handleSailsPost);
     server.on("/restart", HTTP_GET, handleRestart);
     server.on("/update", HTTP_GET, handleUpdatePage);
     server.on("/update", HTTP_POST, handleUpdateResult, handleUpdateUpload);

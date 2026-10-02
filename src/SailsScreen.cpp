@@ -74,6 +74,13 @@ int SailsScreen::run(const m5::touch_detail_t &t)
     if (state->displaySaver != DISPLAY_ACTIVE)
         return -1;
 
+    if (state->sailsDirty)
+    {
+        state->sailsDirty = false;
+        for (int r = 0; r < ROWS; r++)
+            drawRow(r);
+    }
+
     if (bdone != nullptr && bdone->handleTouch(t))
         return 0;
 
